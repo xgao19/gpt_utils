@@ -7,6 +7,7 @@
 import gpt as g
 import sys, os
 import numpy as np
+from gpt_qpdf_utils import *
 
 # configure
 # root_output = "/p/project/chbi21/gpt_test/DA"
@@ -28,9 +29,10 @@ groups = {
 }
 
 zmax = 6
-Gamma = g.gamma["T"]
 t_insert = 4
-mom = [0,0,0,0]
+pzmin = 0
+pzmax = 5
+plist = range(pzmin,pzmax)
 width = 1.0
 pos_boost = [0,0,0]
 neg_boost = [0,0,0]
@@ -49,77 +51,10 @@ jobs = {
         "low": 0,
         "all_time_slices": True,
     },  # 2652 seconds + 580 to load ev
-    "booster_sloppy_1": {"exact": 0, "sloppy": 32, "low": 0, "all_time_slices": True},
-    "booster_sloppy_2": {"exact": 0, "sloppy": 32, "low": 0, "all_time_slices": True},
-    "booster_sloppy_3": {"exact": 0, "sloppy": 32, "low": 0, "all_time_slices": True},
-    "booster_sloppy_4": {"exact": 0, "sloppy": 32, "low": 0, "all_time_slices": True},
-    "booster_sloppy_5": {"exact": 0, "sloppy": 32, "low": 0, "all_time_slices": True},
-    "booster_sloppy_6": {"exact": 0, "sloppy": 32, "low": 0, "all_time_slices": True},
-    "booster_sloppy_7": {"exact": 0, "sloppy": 32, "low": 0, "all_time_slices": True},
-    "booster_low_0": {
-        "exact": 0,
-        "sloppy": 0,
-        "low": 150,
-        "all_time_slices": True,
-    },  # 2100 seconds + 600 to load ev
-    "booster_low_1": {"exact": 0, "sloppy": 0, "low": 600, "all_time_slices": True},
-    "booster_low_2": {"exact": 0, "sloppy": 0, "low": 600, "all_time_slices": True},
-    "booster_low_3": {"exact": 0, "sloppy": 0, "low": 600, "all_time_slices": True},
-    "booster_low_4": {"exact": 0, "sloppy": 0, "low": 600, "all_time_slices": True},
-    "booster_low_5": {"exact": 0, "sloppy": 0, "low": 600, "all_time_slices": True},
-    "booster_low_6": {"exact": 0, "sloppy": 0, "low": 600, "all_time_slices": True},
-    "booster_low_7": {"exact": 0, "sloppy": 0, "low": 600, "all_time_slices": True},
-    "booster_exact_0_correlated": {
-        "exact": 1,
-        "sloppy": 0,
-        "low": 0,
-        "all_time_slices": False,
-    },  # 1270 seconds + 660 to load ev
-    "booster_sloppy_0_correlated": {
-        "exact": 0,
-        "sloppy": 8,
-        "low": 0,
-        "all_time_slices": False,
-    },  # 2652 seconds + 580 to load ev
-    "booster_sloppy_1_correlated": {
-        "exact": 0,
-        "sloppy": 32,
-        "low": 0,
-        "all_time_slices": False,
-    },
-    "booster_sloppy_2_correlated": {
-        "exact": 0,
-        "sloppy": 32,
-        "low": 0,
-        "all_time_slices": False,
-    },
-    "booster_low_0_correlated": {
-        "exact": 0,
-        "sloppy": 0,
-        "low": 150,
-        "all_time_slices": False,
-    },  # 2100 seconds + 600 to load ev
-    "booster_low_1_correlated": {
-        "exact": 0,
-        "sloppy": 0,
-        "low": 600,
-        "all_time_slices": False,
-    },
-    "booster_low_2_correlated": {
-        "exact": 0,
-        "sloppy": 0,
-        "low": 600,
-        "all_time_slices": False,
-    },
 }
-
-# At 32 jobs we break even with eigenvector generation
-
-simultaneous_low_positions = 2
 
 jobs_per_run = g.default.get_int("--gpt_jobs", 1)
 
-source_time_slices = 2
 
 save_propagators = False
 
@@ -191,95 +126,9 @@ del U_prime
 
 L = U[0].grid.fdimensions
 
-l_exact = g.qcd.fermion.mobius(
-    U,
-    {
-        "mass": 0.00054,
-        "M5": 1.8,
-        "b": 1.5,
-        "c": 0.5,
-        "Ls": 12,
-        "boundary_phases": [1.0, 1.0, 1.0, -1.0],},
-)
+prop_exact, prop_sloppy = make_debugging_inverter(U)
 
-g.message("after Mobius def")
-
-l_sloppy = l_exact.converted(g.single)
-
-###These are all Dummy inverters so I can do tests without deflation!
-light_innerL_inverter = g.algorithms.inverter.preconditioned(g.qcd.fermion.preconditioner.eo1_ne(parity=g.odd), g.algorithms.inverter.cg(eps = 1e-8, maxiter = 200))
-light_innerH_inverter = g.algorithms.inverter.preconditioned(g.qcd.fermion.preconditioner.eo1_ne(parity=g.odd), g.algorithms.inverter.cg(eps = 1e-8, maxiter = 300))
-## not sure if we are going to include measurements on low modes only?
-# light_low_inverter = g.algorithms.inverter.preconditioned(g.qcd.fermion.preconditioner.eo1_ne(parity=g.odd), g.algorithms.inverter.cg(eps = 1e-8, maxiter = 200))
-
-#############Here is the stuff for the inverters used in the production run!!
-
-# eig = g.load(groups[group]["evec_fmt"], grids=l_sloppy.F_grid_eo)
-# ## pin coarse eigenvectors to GPU memory
-# pin = g.pin(eig[1], g.accelerator)
-
-
-# light_innerL_inverter = g.algorithms.inverter.preconditioned(
-#     g.qcd.fermion.preconditioner.eo1_ne(parity=g.odd),
-#     g.algorithms.inverter.sequence(
-#         g.algorithms.inverter.coarse_deflate(
-#             eig[1],
-#             eig[0],
-#             eig[2],
-#             block=400,
-#             fine_block=4,
-#             linear_combination_block=32,
-#         ),
-#         g.algorithms.inverter.split(
-#             g.algorithms.inverter.cg({"eps": 1e-8, "maxiter": 200}),
-#             mpi_split=g.default.get_ivec("--mpi_split", None, 4),
-#         ),
-#     ),
-# )
-
-# light_innerH_inverter = g.algorithms.inverter.preconditioned(
-#     g.qcd.fermion.preconditioner.eo1_ne(parity=g.odd),
-#     g.algorithms.inverter.sequence(
-#         g.algorithms.inverter.coarse_deflate(
-#             eig[1],
-#             eig[0],
-#             eig[2],
-#             block=400,
-#             fine_block=4,
-#             linear_combination_block=32,
-#         ),
-#         g.algorithms.inverter.split(
-#             g.algorithms.inverter.cg({"eps": 1e-8, "maxiter": 300}),
-#             mpi_split=g.default.get_ivec("--mpi_split", None, 4),
-#         ),
-#     ),
-# )
-
-# light_low_inverter = g.algorithms.inverter.preconditioned(
-#     g.qcd.fermion.preconditioner.eo1_ne(parity=g.odd),
-#     g.algorithms.inverter.coarse_deflate(
-#         eig[1], eig[0], eig[2], block=400, linear_combination_block=32, fine_block=4
-#     ),
-# )
-
-light_exact_inverter = g.algorithms.inverter.defect_correcting(
-    g.algorithms.inverter.mixed_precision(light_innerH_inverter, g.single, g.double),
-    eps=1e-8,
-    maxiter=10,
-)
-
-light_sloppy_inverter = g.algorithms.inverter.defect_correcting(
-    g.algorithms.inverter.mixed_precision(light_innerL_inverter, g.single, g.double),
-    eps=1e-8,
-    maxiter=2,
-)
-
-
-############### inverter definitions finished
-
-# prop_l_low = l_sloppy.propagator(light_low_inverter)
-prop_l_sloppy = l_exact.propagator(light_sloppy_inverter).grouped(6)
-prop_l_exact = l_exact.propagator(light_exact_inverter).grouped(6)
+phases = make_mom_phases(U[0].grid, L, plist)
 
 
 # show available memory
@@ -304,10 +153,6 @@ for group, job, conf, jid, n in run_jobs:
     job_seed = job.split("_correlated")[0]
     rng = g.random(f"DA-ensemble-{conf}-{job_seed}")
 
-    # source_positions_low = [
-    #     [rng.uniform_int(min=0, max=L[i] - 1) for i in range(4)]
-    #     for j in range(jobs[job]["low"])
-    # ]
     source_positions_sloppy = [
         [rng.uniform_int(min=0, max=L[i] - 1) for i in range(4)]
         for j in range(jobs[job]["sloppy"])
@@ -317,27 +162,14 @@ for group, job, conf, jid, n in run_jobs:
         for j in range(jobs[job]["exact"])
     ]
 
-    all_time_slices = jobs[job]["all_time_slices"]
-    use_source_time_slices = source_time_slices
-    if not all_time_slices:
-        use_source_time_slices = 1
-
-    # g.message(f" positions_low = {source_positions_low}")
     g.message(f" positions_sloppy = {source_positions_sloppy}")
     g.message(f" positions_exact = {source_positions_exact}")
-    # g.message(f" all_time_slices = {all_time_slices}")
+
 
     root_job = f"{root_output}/{conf}/{job}"
     output = g.gpt_io.writer(f"{root_job}/propagators")
     output_correlator = g.corr_io.writer(f"{root_job}/correlators.dat")
 
-    # make momentum operator
-    p = -2 * np.pi * np.array(mom) / L
-    P = g.exp_ixp(p)
-
-    G_op = g.gamma[5] * g.adj(P) 
-    #the g.adj(P) is due to the fact that the Fourier factor is changed by daggering when using gamma5 hermiticity
-    
 
     # create Wilson line
     def create_WL(z):
