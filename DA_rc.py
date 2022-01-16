@@ -11,7 +11,7 @@ from gpt_qpdf_utils import pion_DA_measurement
 
 # configure
 root_output = "/p/project/chbi21/gpt_test/DA"
-#root_output = "/p/scratch/chbi21/scior"
+#root_output ="."
 
 # 420, 500, 580
 groups = {
@@ -43,12 +43,12 @@ jobs = {
         "exact": 1,
         "sloppy": 0,
         "low": 0,
-    },  # 1270 seconds + 660 to load ev
+    },  
     "booster_sloppy_0": {
         "exact": 0,
         "sloppy": 10,
         "low": 0,
-    },  # 2652 seconds + 580 to load ev
+    }, 
 }
 
 
@@ -125,7 +125,9 @@ L = U[0].grid.fdimensions
 
 Measurement = pion_DA_measurement(parameters)
 
-prop_exact, prop_sloppy, pin = Measurement.make_96I_inverter(U, groups[group]["evec_fmt"])
+#prop_exact, prop_sloppy, pin = Measurement.make_96I_inverter(U, groups[group]["evec_fmt"])
+
+prop_exact, prop_sloppy = Measurement.make_debugging_inverter(U)
 
 phases = Measurement.make_mom_phases(U[0].grid, L)
 
@@ -202,7 +204,7 @@ for group, job, conf, jid, n in run_jobs:
         g.message("2pt contraction done")
 
         if(parameters["save_propagators"]):
-            Measurement.save_propagators(tag, prop_exact_f, prop_exact_b)
+            Measurement.propagator_output(tag, prop_exact_f, prop_exact_b)
 
         del prop_exact_f
         del prop_exact_b
@@ -234,7 +236,7 @@ for group, job, conf, jid, n in run_jobs:
         g.message("2pt contraction done")
 
         if(parameters["save_propagators"]):
-            Measurement.save_propagators(tag, prop_sloppy_f, prop_sloppy_b)
+            Measurement.propagator_output(tag, prop_sloppy_f, prop_sloppy_b)
 
         del prop_sloppy_f
         del prop_sloppy_b
@@ -275,12 +277,12 @@ for group, job, conf, jid, n in run_jobs:
         g.message("pion contraction done")
 
         if(parameters["save_propagators"]):
-            Measurement.save_propagators(tag, prop_sloppy_f, prop_sloppy_b)
+            Measurement.propagator_output(tag, prop_sloppy_f, prop_sloppy_b)
 
         del prop_sloppy_f
         del prop_sloppy_b      
     
     g.message("sloppy positions done")
         
-del pin
+#del pin
 

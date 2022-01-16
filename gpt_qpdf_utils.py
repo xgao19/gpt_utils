@@ -17,13 +17,13 @@ class pion_measurement:
         self.neg_boost = parameters["neg_boost"]
         self.save_propagators = parameters["save_propagators"]
 
-    def set_output_facilites(corr_file, prop_file):
+    def set_output_facilites(self, corr_file, prop_file):
         self.output_correlator = g.corr_io.writer(corr_file)
         
         if(self.save_propagators):
             self.output = g.gpt_io.writer(prop_file)
 
-    def save_propagators(tag, prop_f, prop_b):
+    def propagator_output(self, tag, prop_f, prop_b):
 
         g.message("Saving forward propagator")
         prop_f_tag = "%s/%s" % (tag, str(self.pos_boost)) 
@@ -37,7 +37,7 @@ class pion_measurement:
 
 
     #make the inverters needed for the 96I lattices
-    def make_96I_inverter(U, evec_file):
+    def make_96I_inverter(self, U, evec_file):
 
         l_exact = g.qcd.fermion.mobius(
             U,
@@ -112,7 +112,7 @@ class pion_measurement:
 
         return prop_l_exact, prop_l_sloppy, pin
 
-    def make_debugging_inverter(U):
+    def make_debugging_inverter(self, U):
 
         l_exact = g.qcd.fermion.mobius(
             U,
@@ -142,11 +142,13 @@ class pion_measurement:
             maxiter=2,
         )
 
+        prop_l_sloppy = l_exact.propagator(light_sloppy_inverter).grouped(6)
+        prop_l_exact = l_exact.propagator(light_exact_inverter).grouped(6)
         return prop_l_exact, prop_l_sloppy
 
 
     ############## make list of complex phases for momentum proj.
-    def make_mom_phases(grid, L):    
+    def make_mom_phases(self, grid, L):    
         one = g.complex(grid)
         p = [-2 * np.pi * np.array([0, 0, pz, 0]) / L for pz in self.plist]
         P = g.exp_ixp(p)
@@ -154,7 +156,7 @@ class pion_measurement:
         return mom
 
     # create Wilson lines
-    def create_WL(U):
+    def create_WL(self, U):
         W = []
         W.append(g.qcd.gauge.unit(U[2].grid)[0])
         for dz in range(0, self.zmax):
@@ -164,7 +166,7 @@ class pion_measurement:
 
 
     #function that does the contractions for the smeared-smeared pion 2pt function
-    def contract_2pt(prop_f, prop_b, phases, trafo, tag):
+    def contract_2pt(self, prop_f, prop_b, phases, trafo, tag):
 
         g.message("Begin sink smearing")
         tmp_trafo = g.convert(trafo, prop_f.grid.precision)
@@ -190,7 +192,7 @@ class pion_measurement:
                 #g.message("Correlator %s\n" % out_tag, corr_t)
 
     #function that creates boosted, smeared src.
-    def create_src_2pt(pos, trafo, grid):
+    def create_src_2pt(self, pos, trafo, grid):
         
         srcD = g.mspincolor(grid)
         srcD[:] = 0
@@ -216,7 +218,7 @@ class pion_measurement:
 class pion_DA_measurement(pion_measurement):
 
     # Creating list of W*prop_b for all z
-    def constr_backw_prop_for_DA(prop_b, W):
+    def constr_backw_prop_for_DA(self, prop_b, W):
         g.message("Creating list of W*prop_b for all z")
         prop_list = [prop_b,]
 
@@ -226,7 +228,7 @@ class pion_DA_measurement(pion_measurement):
         return prop_list
 
     # Function that essentially defines our version of DA
-    def contract_DA(prop_f, prop_b, phases, tag):
+    def contract_DA(self, prop_f, prop_b, phases, tag):
 
         # create and save correlators
         corr = g.slice_tr1(prop_b,prop_f,phases, 3)
