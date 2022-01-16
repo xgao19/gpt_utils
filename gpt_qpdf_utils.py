@@ -114,15 +114,6 @@ def make_debugging_inverter(U):
     return prop_l_exact, prop_l_sloppy
 
 
-
-
-############### inverter definitions finished
-
-# prop_l_low = l_sloppy.propagator(light_low_inverter)
-prop_l_sloppy = l_exact.propagator(light_sloppy_inverter).grouped(6)
-prop_l_exact = l_exact.propagator(light_exact_inverter).grouped(6)
-
-
 ############## make list of complex phases for momentum proj.
 def make_mom_phases(grid, L, plist):    
     one = g.complex(grid)
@@ -151,7 +142,7 @@ def constr_backw_prop_for_DA(prop_b, W, zmax):
     return prop_list
 
 # Function that essentially defines our version of DA
-def contract_DA(prop_f, prop_b, phases, tag):
+def contract_DA(prop_f, prop_b, phases, plist, tag):
 
     # create and save correlators
     corr = g.slice_tr1(prop_b,prop_f,phases, 3)
@@ -171,7 +162,7 @@ def contract_DA(prop_f, prop_b, phases, tag):
 
 
 #function that does the contractions for the smeared-smeared pion 2pt function
-def contract_2pt(prop_f, prop_b, phases, width, pos_boost, neg_boost, trafo, tag):
+def contract_2pt(prop_f, prop_b, phases, width, pos_boost, neg_boost, trafo, plist, tag):
     #prop_tag = "%s/%s" % (tag, str(pos))
     g.message("Begin sink smearing")
     tmp_trafo = g.convert(trafo, prop_f.grid.precision)

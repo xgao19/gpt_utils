@@ -194,12 +194,12 @@ for group, job, conf, jid, n in run_jobs:
 
         prop_b = constr_backw_prop_for_DA(prop_exact_b,W,zmax)
         g.message("Start DA contractions")
-        contract_DA(prop_exact_f, prop_b, phases, tag)
+        contract_DA(prop_exact_f, prop_b, phases, plist, tag)
         del prop_b
         g.message("DA done")
 
         g.message("Starting 2pt contraction (includes sink smearing)")
-        contract_2pt(prop_exact_f, prop_exact_b, phases, width, pos_boost, neg_boost, trafo, tag)
+        contract_2pt(prop_exact_f, prop_exact_b, phases, width, pos_boost, neg_boost, trafo, plist, tag)
         g.message("2pt contraction done")
 
         if(save_propagators):
@@ -234,12 +234,12 @@ for group, job, conf, jid, n in run_jobs:
         prop_b = constr_backw_prop_for_DA(prop_sloppy_b,W,zmax)
 
         g.message("Start DA contractions")
-        contract_DA(prop_sloppy_f, prop_b, phases, tag)
+        contract_DA(prop_sloppy_f, prop_b, phases, plist, tag)
         del prop_b
         g.message("DA done")
 
         g.message("Starting 2pt contraction (includes sink smearing)")
-        contract_2pt(prop_sloppy_f, prop_sloppy_b, phases, width, pos_boost, neg_boost, trafo, tag)
+        contract_2pt(prop_sloppy_f, prop_sloppy_b, phases, width, pos_boost, neg_boost, trafo, plist, tag)
         g.message("2pt contraction done")
 
         if(save_propagators):
@@ -278,14 +278,14 @@ for group, job, conf, jid, n in run_jobs:
         prop_b = constr_backw_prop_for_DA(prop_sloppy_b,W,zmax)
 
         g.message("Start DA contractions")
-        contract_DA(prop_sloppy_f, prop_b, phases, tag)
+        contract_DA(prop_sloppy_f, prop_b, phases, plist, tag)
         g.message("DA contractions done")
         del prop_b
 
         g.message("Starting pion 2pt function")
 
         g.message("Starting pion contraction (includes sink smearing)")
-        contract_2pt(prop_sloppy_f, prop_sloppy_b, phases, width, pos_boost, neg_boost, trafo, tag)
+        contract_2pt(prop_sloppy_f, prop_sloppy_b, phases, width, pos_boost, neg_boost, trafo, plist, tag)
         g.message("pion contraction done")
 
         if(save_propagators):
