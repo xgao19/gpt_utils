@@ -1,5 +1,4 @@
 import gpt as g
-import sys, os
 import numpy as np
 
 
@@ -148,9 +147,9 @@ class pion_measurement:
 
 
     ############## make list of complex phases for momentum proj.
-    def make_mom_phases(self, grid, L):    
+    def make_mom_phases(self, grid):    
         one = g.complex(grid)
-        p = [-2 * np.pi * np.array([0, 0, pz, 0]) / L for pz in self.plist]
+        p = [-2 * np.pi * np.array([0, 0, pz, 0]) / grid.fdimensions for pz in self.plist]
         P = g.exp_ixp(p)
         mom = [g.eval(pp*one) for pp in P]
         return mom
@@ -246,5 +245,43 @@ class pion_DA_measurement(pion_measurement):
                     self.output_correlator.write(out_tag, corr_t)
                     #g.message("Correlator %s\n" % out_tag, corr_t)
 
+class pion_qpdf_measurement(pion_measurement):
 
+    def contract_3pt(self, pos, prop_f, prop_b, tag):
+        threept_tag = "%s/%s" % (tag, str(pos))
+
+        
+        corr = g.slice(
+            g.trace(g.adj(prop_b)*Gamma*g.adj(P)*prop_f), 3
+        )
+
+        corr_tag = "%s/3pt" % (threept_tag)
+        self.output_correlator.write(corr_tag, corr)
+        g.message("3pt Correlator %s\n" % corr_tag, corr)
+
+
+    def create_bw_seq(self, inverter, prop, trafo, t_insert):
+
+        tmp_trafo = g.convert(trafo, prop.grid.precision)
+
+        # sequential solve through t=insertion_time
+        t_op = t_insert
+        src_seq = g.lattice(prop)
+        src_seq[:] = 0
+        src_seq[:, :, :, t_op] = prop[:, :, :, t_op]
+
+        del prop
+
+        # create seq prop using gamma5 hermiticity
+        dst_seq = g.lattice(src_seq)
+        src_seq @=  g.gamma["5"]* src_seq
+
+        #TODO: Plug in multiplication with correct phase factor
+
+        dst_seq = g.create.smear.boosted_smearing(tmp_trafo, src_seq, w=self.width, boost=self.neg_boost)
+        dst_seq @= inverter * src_seq
+
+        dst_seq @= g.gamma[5] * dst_seq
+
+        return dst_seq
 

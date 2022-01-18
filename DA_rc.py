@@ -129,7 +129,7 @@ Measurement = pion_DA_measurement(parameters)
 
 prop_exact, prop_sloppy = Measurement.make_debugging_inverter(U)
 
-phases = Measurement.make_mom_phases(U[0].grid, L)
+phases = Measurement.make_mom_phases(U[0].grid)
 
 
 # show available memory

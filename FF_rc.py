@@ -4,14 +4,17 @@
 #
 # Calculate pion DA with A2A method
 #
+from logging import RootLogger
+from DA_rc import Measurement
 import gpt as g
 import sys, os
 import numpy as np
-from gpt_qpdf_utils import *
+from gpt_qpdf_utils import pion_qpdf_measurement
 
 # configure
 # root_output = "/p/project/chbi21/gpt_test/DA"
 root_output = "/home/scior/gpt_cpu/tests/qcd"
+root_output = "."
 
 # 420, 500, 580
 groups = {
@@ -28,15 +31,17 @@ groups = {
 
 }
 
-zmax = 6
-t_insert = 4
-pzmin = 0
-pzmax = 5
-plist = range(pzmin,pzmax)
-width = 1.0
-pos_boost = [0,0,0]
-neg_boost = [0,0,0]
+parameters = {
+    "zmax" : 6,
+    "pzmin" : 0,
+    "pzmax" : 5,
+    "width" : 1.0,
+    "pos_boost" : [0,0,0],
+    "neg_boost" : [0,0,0],
+    "save_propagators" : False
+}
 
+t_insert = 4
 
 jobs = {
     "booster_exact_0": {
@@ -55,8 +60,6 @@ jobs = {
 
 jobs_per_run = g.default.get_int("--gpt_jobs", 1)
 
-
-save_propagators = False
 
 # find jobs for this run
 def get_job(only_on_conf=None):
@@ -109,13 +112,13 @@ group = run_jobs[0][0]
 
 
 ##### small dummy used for testing
-grid = g.grid([8,8,8,8], g.double)
-rng = g.random("seed text")
-U = g.qcd.gauge.random(grid, rng)
+# grid = g.grid([8,8,8,8], g.double)
+# rng = g.random("seed text")
+# U = g.qcd.gauge.random(grid, rng)
 
 # loading gauge configuration
-# U = g.load(groups[group]["conf_fmt"] % conf)
-# g.message("finished loading gauge config")
+U = g.load(groups[group]["conf_fmt"] % conf)
+g.message("finished loading gauge config")
 
 
 # do gauge fixing
@@ -126,9 +129,12 @@ del U_prime
 
 L = U[0].grid.fdimensions
 
-prop_exact, prop_sloppy = make_debugging_inverter(U)
+Measurement = pion_qpdf_measurement(parameters)
 
-phases = make_mom_phases(U[0].grid, L, plist)
+prop_exact, prop_sloppy, pin = Measurement.make_96I_inverter(U, groups[group]["evec_fmt"])
+#prop_exact, prop_sloppy = Measurement.make_debugging_inverter(U)
+
+phases = Measurement.make_mom_phases(U[0].grid, L)
 
 
 # show available memory
@@ -167,120 +173,8 @@ for group, job, conf, jid, n in run_jobs:
 
 
     root_job = f"{root_output}/{conf}/{job}"
-    output = g.gpt_io.writer(f"{root_job}/propagators")
-    output_correlator = g.corr_io.writer(f"{root_job}/correlators.dat")
 
-
-    # create Wilson line
-    def create_WL(z):
-        W = []
-        W.append(g.qcd.gauge.unit(U[2].grid, Nd=1)[0])
-        for dz in range(0, z):
-            W.append(g.eval(g.cshift(U[2], 2, dz) * W[dz-1]))
-                
-        return W
-
-
-    def contract_2pt(pos, prop_f, prop_b, tag):
-        prop_tag = "%s/%s" % (tag, str(pos))
-        g.message("Begin sink smearing")
-        tmp_trafo = g.convert(trafo, prop_f.grid.precision)
-
-        prop_f = g.create.smear.boosted_smearing(tmp_trafo, prop_f, w=width, boost=pos_boost)
-        prop_f = g.create.smear.boosted_smearing(tmp_trafo, prop_b, w=width, boost=neg_boost)
-        g.message("Sink smearing completed")
-
-        corr = g.slice(
-            g.trace(g.adj(P) * prop_f * P * g.adj(prop_b) ), 3
-        ) 
-
-        corr_tag = "%s/2pt" % (prop_tag)
-        output_correlator.write(corr_tag, corr)
-        g.message("2pt Correlator %s\n" % corr_tag, corr)
-
-    def contract_3pt(pos, prop_f, prop_b, tag):
-        threept_tag = "%s/%s" % (tag, str(pos))
-
-
-        corr = g.slice(
-            g.trace(g.adj(prop_b)*Gamma*g.adj(P)*prop_f), 3
-        )
-
-        corr_tag = "%s/3pt" % (threept_tag)
-        output_correlator.write(corr_tag, corr)
-        g.message("3pt Correlator %s\n" % corr_tag, corr)
-
-
-    def create_src_3pt(pos):
-        
-        srcD = g.mspincolor(l_exact.U_grid)
-        srcD[:] = 0
-
-        g.create.point(srcD, pos)
-
-        return srcD
-
-    def create_bw_seq(src, exact_flag):
-
-        tmp_trafo = g.convert(trafo, src.grid.precision)
-
-        
-        if(exact_flag):
-            prop_sp = g.eval(prop_l_exact * g.adj(P) * src)
-        else:
-            prop_sp = g.eval(prop_l_sloppy * g.adj(P) * src)
-        #the adj(P) is due to the fact that the Fourier factor is changed by daggering when using gamma5 hermiticity
-        prop_sp = g.create.smear.boosted_smearing(tmp_trafo, prop_sp, w=width, boost=neg_boost)
-
-        # sequential solve through t=insertion_time
-        t_op = t_insert
-        src_seq = g.lattice(src)
-        src_seq[:] = 0
-        src_seq[:, :, :, t_op] = prop_sp[:, :, :, t_op]
-
-        # create seq prop using gamma5 hermiticity
-        dst_seq = g.lattice(src_seq)
-        src_seq @= G_op * src_seq
-
-        del prop_sp
-
-        dst_seq = g.create.smear.boosted_smearing(tmp_trafo, src_seq, w=width, boost=neg_boost)
-        if(exact_flag):
-            dst_seq @= prop_l_exact * src_seq
-        else:
-            dst_seq @= prop_l_sloppy * src_seq
-
-        dst_seq = g.create.smear.boosted_smearing(tmp_trafo, dst_seq, w=width, boost=neg_boost)
-
-        dst_seq @= g.gamma[5] * dst_seq
-
-        return dst_seq
-
-
-    def create_src_2pt(pos):
-        
-        srcD = g.mspincolor(l_exact.U_grid)
-        srcD[:] = 0
-        
-        srcDp = g.mspincolor(l_exact.U_grid)
-        srcDp[:] = 0
-
-        srcDm = g.mspincolor(l_exact.U_grid)
-        srcDm[:] = 0
-
-        g.create.point(srcD, pos)
-
-
-        srcDm = g.create.smear.boosted_smearing(trafo, srcD, w=width, boost=neg_boost)
-        srcDp = g.create.smear.boosted_smearing(trafo, srcD, w=width, boost=pos_boost)
-
-        del srcD
-
-        return srcDp, srcDm
-
-
-    # g.message("Starting Wilson loops")
-    # W = create_WL(zmax)
+    Measurement.set_output_facilites(f"{root_job}/correlators",f"{root_job}/propagators")
 
     # exact positions
     for pos in source_positions_exact:
@@ -290,30 +184,28 @@ for group, job, conf, jid, n in run_jobs:
         g.message("Starting 2pt function")
 
         g.message("Generatring boosted src's")
-        srcDp, srcDm = create_src_2pt(pos)  
+        srcDp, srcDm = Measurement.create_src_2pt(pos)  
 
         g.message("Starting prop exact")
-        prop_exact_f = g.eval(prop_l_exact * srcDp)
+        prop_exact_f = g.eval(prop_exact * srcDp)
         g.message("forward prop done")
-        prop_exact_b = g.eval(prop_l_exact * srcDm)
+        prop_exact_b = g.eval(prop_exact * srcDm)
         g.message("backward prop done")
 
-        g.message("Starting pion contraction (includes sink smearing)")
-        contract_2pt(pos, prop_exact_f, prop_exact_b, "exact")
-        g.message("pion contraction done")
+        tag = "%s/%s" % ("exact", str(pos))
 
-        del prop_exact_b
+        g.message("Starting pion contraction (includes sink smearing)")
+        Measurement.contract_2pt(prop_exact_f, prop_exact_b, phases, trafo, tag)
+        g.message("pion contraction done")
 
         g.message("Starting 3pt function")
 
-        g.message("Generatring point src")
-        srcD = create_src_3pt(pos)  
-
         g.message("Starting bw seq propagator")
 
-        prop_exact_b = create_bw_seq(srcD, True)
+        prop_exact_b = Measurement.create_bw_seq(prop_exact, prop_exact_b, trafo, t_insert)
 
         g.message("Starting 3pt contractions")
+        
         contract_3pt(pos, prop_exact_f, prop_exact_b, "exact")
         g.message("3pt contractions done")
        
