@@ -1,5 +1,6 @@
+from cmath import phase
+from math import gamma
 import gpt as g
-import sys, os
 import numpy as np
 
 
@@ -148,9 +149,9 @@ class pion_measurement:
 
 
     ############## make list of complex phases for momentum proj.
-    def make_mom_phases(self, grid, L):    
+    def make_mom_phases(self, grid):    
         one = g.complex(grid)
-        p = [-2 * np.pi * np.array([0, 0, pz, 0]) / L for pz in self.plist]
+        p = [-2 * np.pi * np.array([0, 0, pz, 0]) / grid.fdimensions for pz in self.plist]
         P = g.exp_ixp(p)
         mom = [g.eval(pp*one) for pp in P]
         return mom
@@ -197,12 +198,6 @@ class pion_measurement:
         srcD = g.mspincolor(grid)
         srcD[:] = 0
         
-        srcDp = g.mspincolor(grid)
-        srcDp[:] = 0
-
-        srcDm = g.mspincolor(grid)
-        srcDm[:] = 0
-
         g.create.point(srcD, pos)
 
 
@@ -246,5 +241,118 @@ class pion_DA_measurement(pion_measurement):
                     self.output_correlator.write(out_tag, corr_t)
                     #g.message("Correlator %s\n" % out_tag, corr_t)
 
+class pion_ff_measurement(pion_measurement):
+
+    #this still needs work!
+    def contract_FF(self, prop_f, prop_b, phases, tag):
+
+        #This should work, as both prop are not lists! 
+        #Maybe the in the IO I need a corr[0] in the first enumerate(corr)
+        corr = g.slice_tr1(prop_b, prop_f, phases, 3)
+
+        g.message("Starting IO")
+        for i, corr_mu in enumerate(corr):
+            out_tag = f"{tag}/FF/q{self.plist[i]}"
+            for j, corr_t in enumerate(corr_mu):
+                out_tag = f"{out_tag}/{my_gammas[j]}"
+                self.output_correlator.write(out_tag, corr_t)
 
 
+
+    def create_bw_seq(self, inverter, prop, trafo, t_insert, pz):
+
+        tmp_trafo = g.convert(trafo, prop.grid.precision)
+
+        sp_prop = g.create.smear.boosted_smearing(tmp_trafo, prop, w=self.width, boost=self.neg_boost)
+
+        del prop
+
+        p = 2.0 * np.pi * np.array(pz) / prop.grid.fdimensions
+        P = g.exp_ixp(p)
+
+        # sequential solve through t=insertion_time
+        t_op = t_insert
+        src_seq = g.lattice(sp_prop)
+        src_seq[:] = 0
+        src_seq[:, :, :, t_op] = sp_prop[:, :, :, t_op]
+
+        del sp_prop
+
+        src_seq @=  g.gamma["5"]* src_seq
+        #multiply with complex conjugate phase because it's a backwards prop.
+        src_seq @= g.adj(P)* src_seq 
+
+
+        #does overwriting on the fly work?
+        src_seq = g.create.smear.boosted_smearing(tmp_trafo, src_seq, w=self.width, boost=self.pos_boost)
+
+        dst_seq = g.lattice(src_seq)
+        dst_seq @= inverter * src_seq
+
+        dst_seq = g.create.smear.boosted_smearing(tmp_trafo, g.eval(dst_seq), w=self.width, boost=self.neg_boost)
+
+        #This is now in principle B_zx but with the complex conj phase and a missing factor of gamma5 
+
+        return (g.adj(dst_seq)*g.gamma["5"])
+
+class pion_qpdf_measurement(pion_measurement):
+
+    #this still needs work!
+    def contract_QPDF(self, prop_f, prop_b, tag):
+
+        #This contraction function still needs to be written, as of now
+        #a list as 2nd argument does not work
+        corr = g.slice_tr2(prop_b, prop_f, 3)
+
+        g.message("Starting IO")       
+        for z, corr_mu in enumerate(corr):
+            corr_tag = "%s/QPDF/z%s" % (tag, str(z))
+            out_tag = f"{corr_tag}/{self.pz}"
+            for j, corr_t in enumerate(corr_mu):
+                out_tag = f"{out_tag}/{my_gammas[j]}"
+                self.output_correlator.write(out_tag, corr_t)
+
+    def create_fw_prop_QPDF(self, prop_f, W):
+        g.message("Creating list of W*prop_f for all z")
+        prop_list = [prop_f,]
+
+        for z in range(1,self.zmax):
+            prop_list.append(g.eval(W[z]*g.cshift(prop_f,2,z)))
+        
+        return prop_list      
+
+    def create_bw_seq(self, inverter, prop, trafo, t_insert, pz, isFF):
+
+        tmp_trafo = g.convert(trafo, prop.grid.precision)
+
+        sp_prop = g.create.smear.boosted_smearing(tmp_trafo, prop, w=self.width, boost=self.pos_boost)
+        
+        del prop
+
+        p = 2.0 * np.pi * np.array(pz) / prop.grid.fdimensions
+        P = g.exp_ixp(p)
+
+        # sequential solve through t=insertion_time
+        t_op = t_insert
+        src_seq = g.lattice(sp_prop)
+        src_seq[:] = 0
+        src_seq[:, :, :, t_op] = sp_prop[:, :, :, t_op]
+
+        del sp_prop
+
+        src_seq @=  g.gamma["5"]* src_seq
+        #multiply with complex conjugate phase because it's a backwards prop.
+        src_seq @= g.adj(P)* src_seq 
+
+
+        #does overwriting on the fly work?
+        src_seq = g.create.smear.boosted_smearing(tmp_trafo, src_seq, w=self.width, boost=self.neg_boost)
+
+        dst_seq = g.lattice(src_seq)
+        dst_seq @= inverter * src_seq
+
+        dst_seq = g.create.smear.boosted_smearing(tmp_trafo, g.eval(dst_seq), w=self.width, boost=self.neg_boost)
+
+        #This is now in principle B_zx but with the complex conj phase and a missing factor of gamma5 
+
+        return (g.adj(dst_seq)*g.gamma["5"])
