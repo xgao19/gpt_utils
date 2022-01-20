@@ -7,11 +7,11 @@
 import gpt as g
 import sys, os
 import numpy as np
-from gpt_qpdf_utils import *
+from gpt_qpdf_utils import pion_ff_measurement
 
 # configure
 # root_output = "/p/project/chbi21/gpt_test/DA"
-root_output = "/home/scior/gpt_cpu/tests/qcd"
+root_output = "."
 
 # 420, 500, 580
 groups = {
@@ -28,35 +28,30 @@ groups = {
 
 }
 
-zmax = 6
-t_insert = 4
-pzmin = 0
-pzmax = 5
-plist = range(pzmin,pzmax)
-width = 1.0
-pos_boost = [0,0,0]
-neg_boost = [0,0,0]
-
+parameters = {
+    "zmax" : 24,
+    "pzmin" : 0,
+    "pzmax" : 5,
+    "width" : 2.2,
+    "pos_boost" : [0,0,0],
+    "neg_boost" : [0,0,0],
+    "save_propagators" : True
+}
 
 jobs = {
     "booster_exact_0": {
         "exact": 1,
         "sloppy": 0,
-        "low": 0,
-        "all_time_slices": True,
-    },  # 1270 seconds + 660 to load ev
+    },
     "booster_sloppy_0": {
         "exact": 0,
         "sloppy": 8,
-        "low": 0,
-        "all_time_slices": True,
-    },  # 2652 seconds + 580 to load ev
+    }, 
 }
 
 jobs_per_run = g.default.get_int("--gpt_jobs", 1)
 
 
-save_propagators = False
 
 # find jobs for this run
 def get_job(only_on_conf=None):
@@ -122,13 +117,15 @@ U = g.qcd.gauge.random(grid, rng)
 
 U_prime, trafo = g.gauge_fix(U, maxiter=500)
 del U_prime
-#trafo = rng.element(g.lattice(U[0]))
 
 L = U[0].grid.fdimensions
 
+
+Measurement = pion_ff_measurement(parameters)
+
 prop_exact, prop_sloppy = make_debugging_inverter(U)
 
-phases = make_mom_phases(U[0].grid, L, plist)
+phases = make_mom_phases(U[0].grid, plist)
 
 
 # show available memory
