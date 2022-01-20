@@ -4,12 +4,13 @@
 #
 # Calculate pion DA with A2A method
 #
+from cmath import phase
 from logging import RootLogger
 from DA_rc import Measurement
 import gpt as g
 import sys, os
 import numpy as np
-from gpt_qpdf_utils import pion_qpdf_measurement
+from gpt_qpdf_utils import pion_qpdf_ff_measurement
 
 # configure
 # root_output = "/p/project/chbi21/gpt_test/DA"
@@ -42,6 +43,8 @@ parameters = {
 }
 
 t_insert = 4
+isFF = True     #If true measures a pion FF, if false do QPDF
+
 
 jobs = {
     "booster_exact_0": {
@@ -129,7 +132,7 @@ del U_prime
 
 L = U[0].grid.fdimensions
 
-Measurement = pion_qpdf_measurement(parameters)
+Measurement = pion_qpdf_ff_measurement(parameters)
 
 prop_exact, prop_sloppy, pin = Measurement.make_96I_inverter(U, groups[group]["evec_fmt"])
 #prop_exact, prop_sloppy = Measurement.make_debugging_inverter(U)
@@ -176,6 +179,10 @@ for group, job, conf, jid, n in run_jobs:
 
     Measurement.set_output_facilites(f"{root_job}/correlators",f"{root_job}/propagators")
 
+    if(not isFF):
+        g.message("Starting Wilson loops")
+        W = Measurement.create_WL(U)
+
     # exact positions
     for pos in source_positions_exact:
 
@@ -202,10 +209,19 @@ for group, job, conf, jid, n in run_jobs:
 
         g.message("Starting bw seq propagator")
 
-        prop_exact_b = Measurement.create_bw_seq(prop_exact, prop_exact_b, trafo, t_insert)
+        prop_exact_b = Measurement.create_bw_seq(prop_exact, prop_exact_b, trafo, t_insert, pz, isFF)
+
+        if(not isFF):
+            g.message("Construct W * forward prop list")
+            prop_f = Measurement.create_fw_prop_QPDF(prop_exact_f, W)
 
         g.message("Starting 3pt contractions")
         
+        if(isFF):
+            Measurement.contract_FF(prop_exact_f, prop_exact_b, phases, tag)
+        else:
+            Measurement.contract_QPDF(prop_f, prop_exact_b, phases, tag)
+
         contract_3pt(pos, prop_exact_f, prop_exact_b, "exact")
         g.message("3pt contractions done")
        
