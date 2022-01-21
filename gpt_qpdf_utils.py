@@ -9,7 +9,6 @@ my_gammas = ["5", "T", "T5", "X", "X5", "Y", "Y5", "Z", "Z5", "I", "SXT", "SXY",
 
 class pion_measurement:
     def __init__(self, parameters):
-        self.zmax = parameters["zmax"]
         self.pzmin = parameters["pzmin"]
         self.pzmax = parameters["pzmax"]
         self.plist = range(self.pzmin,self.pzmax)
@@ -211,6 +210,15 @@ class pion_measurement:
 
 
 class pion_DA_measurement(pion_measurement):
+    def __init__(self, parameters):
+        self.zmax = parameters["zmax"]
+        self.pzmin = parameters["pzmin"]
+        self.pzmax = parameters["pzmax"]
+        self.plist = range(self.pzmin,self.pzmax)
+        self.width = parameters["width"]
+        self.pos_boost = parameters["pos_boost"]
+        self.neg_boost = parameters["neg_boost"]
+        self.save_propagators = parameters["save_propagators"]
 
     # Creating list of W*prop_b for all z
     def constr_backw_prop_for_DA(self, prop_b, W):
@@ -242,6 +250,15 @@ class pion_DA_measurement(pion_measurement):
                     #g.message("Correlator %s\n" % out_tag, corr_t)
 
 class pion_ff_measurement(pion_measurement):
+    def __init__(self, parameters):
+        self.p = parameters["p"]
+        self.q = parameters["q"]
+        self.plist = [self.q,] 
+        self.t_insert = parameters["t_insert"]
+        self.width = parameters["width"]
+        self.pos_boost = parameters["pos_boost"]
+        self.neg_boost = parameters["neg_boost"]
+        self.save_propagators = parameters["save_propagators"]
 
     #this still needs work!
     def contract_FF(self, prop_f, prop_b, phases, tag):
@@ -259,7 +276,7 @@ class pion_ff_measurement(pion_measurement):
 
 
 
-    def create_bw_seq(self, inverter, prop, trafo, t_insert, pz):
+    def create_bw_seq(self, inverter, prop, trafo):
 
         tmp_trafo = g.convert(trafo, prop.grid.precision)
 
@@ -267,11 +284,11 @@ class pion_ff_measurement(pion_measurement):
 
         del prop
 
-        p = 2.0 * np.pi * np.array(pz) / prop.grid.fdimensions
-        P = g.exp_ixp(p)
+        pp = 2.0 * np.pi * np.array(self.p) / prop.grid.fdimensions
+        P = g.exp_ixp(pp)
 
         # sequential solve through t=insertion_time
-        t_op = t_insert
+        t_op = self.t_insert
         src_seq = g.lattice(sp_prop)
         src_seq[:] = 0
         src_seq[:, :, :, t_op] = sp_prop[:, :, :, t_op]
@@ -296,6 +313,14 @@ class pion_ff_measurement(pion_measurement):
         return (g.adj(dst_seq)*g.gamma["5"])
 
 class pion_qpdf_measurement(pion_measurement):
+    def __init__(self, parameters):
+        self.zmax = parameters["zmax"]
+        self.pz = parameters["pz"]
+        self.t_insert = parameters["t_insert"]
+        self.width = parameters["width"]
+        self.pos_boost = parameters["pos_boost"]
+        self.neg_boost = parameters["neg_boost"]
+        self.save_propagators = parameters["save_propagators"]
 
     #this still needs work!
     def contract_QPDF(self, prop_f, prop_b, tag):
@@ -321,7 +346,7 @@ class pion_qpdf_measurement(pion_measurement):
         
         return prop_list      
 
-    def create_bw_seq(self, inverter, prop, trafo, t_insert, pz, isFF):
+    def create_bw_seq(self, inverter, prop, trafo):
 
         tmp_trafo = g.convert(trafo, prop.grid.precision)
 
@@ -329,11 +354,11 @@ class pion_qpdf_measurement(pion_measurement):
         
         del prop
 
-        p = 2.0 * np.pi * np.array(pz) / prop.grid.fdimensions
+        p = 2.0 * np.pi * np.array(self.pz) / prop.grid.fdimensions
         P = g.exp_ixp(p)
 
         # sequential solve through t=insertion_time
-        t_op = t_insert
+        t_op = self.t_insert
         src_seq = g.lattice(sp_prop)
         src_seq[:] = 0
         src_seq[:, :, :, t_op] = sp_prop[:, :, :, t_op]

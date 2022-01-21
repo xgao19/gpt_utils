@@ -2,11 +2,8 @@
 #
 # Authors: Christoph Lehner 2020 / Philipp Scior 2021
 #
-# Calculate pion DA with A2A method
+# Calculate pion FF with A2A method
 #
-from cmath import phase
-from logging import RootLogger
-from DA_rc import Measurement
 import gpt as g
 import sys, os
 import numpy as np
@@ -14,7 +11,7 @@ from gpt_qpdf_utils import pion_ff_measurement
 
 # configure
 # root_output = "/p/project/chbi21/gpt_test/DA"
-root_output = "."
+root_output ="."
 
 # 420, 500, 580
 groups = {
@@ -30,32 +27,34 @@ groups = {
     },
 
 }
-
 parameters = {
     "zmax" : 24,
-    "pzmin" : 0,
-    "pzmax" : 5,
+    "p" : 2,
+    "q" : 2,
+    "t_insert" : 4,
     "width" : 2.2,
     "pos_boost" : [0,0,0],
     "neg_boost" : [0,0,0],
     "save_propagators" : True
 }
 
-t_insert = 4
-
 
 jobs = {
     "booster_exact_0": {
         "exact": 1,
         "sloppy": 0,
-    },
+        "low": 0,
+    },  
     "booster_sloppy_0": {
         "exact": 0,
-        "sloppy": 8,
+        "sloppy": 10,
+        "low": 0,
     }, 
 }
 
+
 jobs_per_run = g.default.get_int("--gpt_jobs", 1)
+
 
 
 # find jobs for this run
@@ -109,12 +108,12 @@ group = run_jobs[0][0]
 
 
 ##### small dummy used for testing
-# grid = g.grid([8,8,8,8], g.double)
-# rng = g.random("seed text")
-# U = g.qcd.gauge.random(grid, rng)
+grid = g.grid([8,8,8,8], g.double)
+rng = g.random("seed text")
+U = g.qcd.gauge.random(grid, rng)
 
 # loading gauge configuration
-U = g.load(groups[group]["conf_fmt"] % conf)
+# U = g.load(groups[group]["conf_fmt"] % conf)
 g.message("finished loading gauge config")
 
 
@@ -125,11 +124,13 @@ del U_prime
 
 L = U[0].grid.fdimensions
 
-Measurement = pion_ff_measurement(parameters)
+Measurement = pion_DA_measurement(parameters)
 
-prop_exact, prop_sloppy = make_debugging_inverter(U)
+#prop_exact, prop_sloppy, pin = Measurement.make_96I_inverter(U, groups[group]["evec_fmt"])
 
-phases = make_mom_phases(U[0].grid, plist)
+prop_exact, prop_sloppy = Measurement.make_debugging_inverter(U)
+
+phases = Measurement.make_mom_phases(U[0].grid)
 
 
 # show available memory
@@ -137,7 +138,7 @@ g.mem_report(details=False)
 g.message(
     """
 ================================================================================
-       FF run on booster ;  this run will attempt:
+       DA run on booster ;  this run will attempt:
 ================================================================================
 """
 )
@@ -163,27 +164,25 @@ for group, job, conf, jid, n in run_jobs:
         for j in range(jobs[job]["exact"])
     ]
 
+
+
     g.message(f" positions_sloppy = {source_positions_sloppy}")
     g.message(f" positions_exact = {source_positions_exact}")
-
 
     root_job = f"{root_output}/{conf}/{job}"
 
     Measurement.set_output_facilites(f"{root_job}/correlators",f"{root_job}/propagators")
 
-    if(not isFF):
-        g.message("Starting Wilson loops")
-        W = Measurement.create_WL(U)
+    g.message("Starting Wilson loops")
+    W = Measurement.create_WL(U)
 
     # exact positions
     for pos in source_positions_exact:
 
         g.message("STARTING EXACT MEASUREMENTS")
 
-        g.message("Starting 2pt function")
-
         g.message("Generatring boosted src's")
-        srcDp, srcDm = Measurement.create_src_2pt(pos)  
+        srcDp, srcDm = Measurement.create_src_2pt(pos, trafo, U[0].grid)
 
         g.message("Starting prop exact")
         prop_exact_f = g.eval(prop_exact * srcDp)
@@ -191,77 +190,54 @@ for group, job, conf, jid, n in run_jobs:
         prop_exact_b = g.eval(prop_exact * srcDm)
         g.message("backward prop done")
 
-        tag = "%s/%s" % ("exact", str(pos))
+        tag = "%s/%s" % ("exact", str(pos)) 
 
-        g.message("Starting pion contraction (includes sink smearing)")
+        g.message("Starting 2pt contraction (includes sink smearing)")
         Measurement.contract_2pt(prop_exact_f, prop_exact_b, phases, trafo, tag)
-        g.message("pion contraction done")
+        g.message("2pt contraction done")
 
-        g.message("Starting 3pt function")
+        if(parameters["save_propagators"]):
+            Measurement.propagator_output(tag, prop_exact_f, prop_exact_b)
 
-        g.message("Starting bw seq propagator")
+        g.message("Create seq. backwards prop")
+        prop_b = Measurement.create_bw_seq(prop_exact, prop_exact_b, trafo, t_insert, pz)
 
-        prop_exact_b = Measurement.create_bw_seq(prop_exact, prop_exact_b, trafo, t_insert, pz, isFF)
-
-        if(not isFF):
-            g.message("Construct W * forward prop list")
-            prop_f = Measurement.create_fw_prop_QPDF(prop_exact_f, W)
-
-        g.message("Starting 3pt contractions")
-        
-        if(isFF):
-            Measurement.contract_FF(prop_exact_f, prop_exact_b, phases, tag)
-        else:
-            Measurement.contract_QPDF(prop_f, prop_exact_b, phases, tag)
-
-        contract_3pt(pos, prop_exact_f, prop_exact_b, "exact")
-        g.message("3pt contractions done")
-       
+        g.message("Start FF contractions")
+        Measurement.contract_FF(prop_exact_f, prop_b, phases, tag)
+        g.message("FF done")
 
         del prop_exact_f
-        del prop_exact_b
- 
-
+        del prop_b
 
         g.message("STARTING SLOPPY MEASUREMENTS")
-
-        g.message("Starting 2pt function")
-
-        # g.message("Generatring boosted src's")
-        # srcDp, srcDm = create_src_2pt(pos)  
-
+    
         g.message("Starting prop sloppy")
-        prop_sloppy_f = g.eval(prop_l_sloppy * srcDp)
+        prop_sloppy_f = g.eval(prop_sloppy * srcDp)
         g.message("forward prop done")
-        prop_sloppy_b = g.eval(prop_l_sloppy * srcDm)
+        prop_sloppy_b = g.eval(prop_sloppy * srcDm)
         g.message("backward prop done")
 
         del srcDp
         del srcDm
 
-        g.message("Starting pion contraction (includes sink smearing)")
-        contract_2pt(pos, prop_sloppy_f, prop_sloppy_b, "sloppy")
-        g.message("pion contraction done")
+        tag = "%s/%s" % ("sloppy", str(pos))
 
-        del prop_sloppy_b
+        g.message("Starting 2pt contraction (includes sink smearing)")
+        Measurement.contract_2pt(prop_sloppy_f, prop_sloppy_b, phases, trafo, tag)
+        g.message("2pt contraction done")
 
-        g.message("Starting 3pt function")
+        if(parameters["save_propagators"]):
+            Measurement.propagator_output(tag, prop_sloppy_f, prop_sloppy_b)
 
-        # g.message("Generatring point src")
-        # srcD = create_src_3pt(pos)  
+        g.message("Create seq. backwards prop")
+        prop_b = Measurement.create_bw_seq(prop_sloppy, prop_sloppy_b, trafo, t_insert, pz)
 
-        g.message("Starting bw seq propagators")
+        g.message("Start FF contractions")
+        Measurement.contract_FF(prop_sloppy_f, prop_b, phases, tag)
+        g.message("FF done")
 
-        prop_sloppy_b = create_bw_seq(srcD, False)
-
-        del srcD
-
-        g.message("Starting 3pt contractions")
-        contract_3pt(pos, prop_sloppy_f, prop_sloppy_b, "sloppy")
-        g.message("3pt contractions done")
-
+        del prop_b
         del prop_sloppy_f
-        del prop_sloppy_b
      
     g.message("exact positions done")
 
@@ -269,44 +245,40 @@ for group, job, conf, jid, n in run_jobs:
     for pos in source_positions_sloppy:
 
         g.message("STARTING SLOPPY MEASUREMENTS")
+        tag = "%s/%s" % ("sloppy", str(pos))
 
-        g.message("Starting 2pt function")
+        g.message("Starting DA 2pt function")
 
-        g.message("Generating boosted src's")
-        srcDp, srcDm = create_src_2pt(pos)  
+        g.message("Generatring boosted src's")
+        srcDp, srcDm = Measurement.create_src_2pt(pos, trafo, U[0].grid)  
 
         g.message("Starting prop sloppy")
-        prop_sloppy_f = g.eval(prop_l_sloppy * srcDp)
+        prop_sloppy_f = g.eval(prop_sloppy * srcDp)
         g.message("forward prop done")
-        prop_sloppy_b = g.eval(prop_l_sloppy * srcDm)
+        prop_sloppy_b = g.eval(prop_sloppy * srcDm)
         g.message("backward prop done")
 
         del srcDp
         del srcDm
 
-        g.message("Starting pion contraction (includes sink smearing)")
-        contract_2pt(pos, prop_sloppy_f, prop_sloppy_b, "sloppy")
-        g.message("pion contraction done")
+        tag = "%s/%s" % ("sloppy", str(pos))
 
-        del prop_sloppy_b
+        g.message("Starting 2pt contraction (includes sink smearing)")
+        Measurement.contract_2pt(prop_sloppy_f, prop_sloppy_b, phases, trafo, tag)
+        g.message("2pt contraction done")
 
-        g.message("Starting 3pt function")
+        if(parameters["save_propagators"]):
+            Measurement.propagator_output(tag, prop_sloppy_f, prop_sloppy_b)
 
-        g.message("Generatring point src")
-        srcD = create_src_3pt(pos)  
+        g.message("Create seq. backwards prop")
+        prop_b = Measurement.create_bw_seq(prop_sloppy, prop_sloppy_b, trafo, t_insert, pz)
 
-        g.message("Starting bw seq propagators")
+        g.message("Start FF contractions")
+        Measurement.contract_FF(prop_sloppy_f, prop_b, phases, tag)
+        g.message("FF done")
 
-        prop_sloppy_b = create_bw_seq(srcD, False)
-
-        del srcD
-
-        g.message("Starting 3pt contractions")
-        contract_3pt(pos, prop_sloppy_f, prop_sloppy_b, "sloppy")
-        g.message("3pt contractions done")
-
-        del prop_sloppy_f
-        del prop_sloppy_b
+        del prop_b
+        del prop_sloppy_f   
     
     g.message("sloppy positions done")
         
