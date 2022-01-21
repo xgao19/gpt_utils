@@ -10,8 +10,8 @@ import numpy as np
 from gpt_qpdf_utils import pion_DA_measurement
 
 # configure
-root_output = "/p/project/chbi21/gpt_test/DA"
-#root_output ="."
+#root_output = "/p/project/chbi21/gpt_test/DA"
+root_output ="."
 
 # 420, 500, 580
 groups = {
@@ -107,12 +107,12 @@ group = run_jobs[0][0]
 
 
 ##### small dummy used for testing
-#grid = g.grid([8,8,8,8], g.double)
-#rng = g.random("seed text")
-#U = g.qcd.gauge.random(grid, rng)
+grid = g.grid([8,8,8,8], g.double)
+rng = g.random("seed text")
+U = g.qcd.gauge.random(grid, rng)
 
 # loading gauge configuration
-U = g.load(groups[group]["conf_fmt"] % conf)
+#U = g.load(groups[group]["conf_fmt"] % conf)
 g.message("finished loading gauge config")
 
 

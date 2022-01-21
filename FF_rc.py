@@ -28,7 +28,6 @@ groups = {
 
 }
 parameters = {
-    "zmax" : 24,
     "p" : 2,
     "q" : 2,
     "t_insert" : 4,
@@ -124,7 +123,7 @@ del U_prime
 
 L = U[0].grid.fdimensions
 
-Measurement = pion_DA_measurement(parameters)
+Measurement = pion_ff_measurement(parameters)
 
 #prop_exact, prop_sloppy, pin = Measurement.make_96I_inverter(U, groups[group]["evec_fmt"])
 
@@ -173,8 +172,6 @@ for group, job, conf, jid, n in run_jobs:
 
     Measurement.set_output_facilites(f"{root_job}/correlators",f"{root_job}/propagators")
 
-    g.message("Starting Wilson loops")
-    W = Measurement.create_WL(U)
 
     # exact positions
     for pos in source_positions_exact:
@@ -198,9 +195,11 @@ for group, job, conf, jid, n in run_jobs:
 
         if(parameters["save_propagators"]):
             Measurement.propagator_output(tag, prop_exact_f, prop_exact_b)
+        
+        del prop_exact_b
 
         g.message("Create seq. backwards prop")
-        prop_b = Measurement.create_bw_seq(prop_exact, prop_exact_b, trafo, t_insert, pz)
+        prop_b = Measurement.create_bw_seq(prop_exact, pos, U[0].grid, trafo)
 
         g.message("Start FF contractions")
         Measurement.contract_FF(prop_exact_f, prop_b, phases, tag)
@@ -230,7 +229,7 @@ for group, job, conf, jid, n in run_jobs:
             Measurement.propagator_output(tag, prop_sloppy_f, prop_sloppy_b)
 
         g.message("Create seq. backwards prop")
-        prop_b = Measurement.create_bw_seq(prop_sloppy, prop_sloppy_b, trafo, t_insert, pz)
+        prop_b = Measurement.create_bw_seq(prop_exact, pos, U[0].grid, trafo)
 
         g.message("Start FF contractions")
         Measurement.contract_FF(prop_sloppy_f, prop_b, phases, tag)
@@ -271,7 +270,7 @@ for group, job, conf, jid, n in run_jobs:
             Measurement.propagator_output(tag, prop_sloppy_f, prop_sloppy_b)
 
         g.message("Create seq. backwards prop")
-        prop_b = Measurement.create_bw_seq(prop_sloppy, prop_sloppy_b, trafo, t_insert, pz)
+        prop_b = Measurement.create_bw_seq(prop_exact, pos, U[0].grid, trafo)
 
         g.message("Start FF contractions")
         Measurement.contract_FF(prop_sloppy_f, prop_b, phases, tag)

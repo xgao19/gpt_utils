@@ -243,9 +243,9 @@ class pion_DA_measurement(pion_measurement):
         for z, corr_p in enumerate(corr):
             corr_tag = "%s/DA/z%s" % (tag, str(z))
             for i, corr_mu in enumerate(corr_p):
-                out_tag = f"{corr_tag}/p{self.plist[i]}"
+                p_tag = f"{corr_tag}/p{self.plist[i]}"
                 for j, corr_t in enumerate(corr_mu):
-                    out_tag = f"{out_tag}/{my_gammas[j]}"
+                    out_tag = f"{p_tag}/{my_gammas[j]}"
                     self.output_correlator.write(out_tag, corr_t)
                     #g.message("Correlator %s\n" % out_tag, corr_t)
 
@@ -260,23 +260,30 @@ class pion_ff_measurement(pion_measurement):
         self.neg_boost = parameters["neg_boost"]
         self.save_propagators = parameters["save_propagators"]
 
-    #this still needs work!
     def contract_FF(self, prop_f, prop_b, phases, tag):
 
         #This should work, as both prop are not lists! 
-        #Maybe the in the IO I need a corr[0] in the first enumerate(corr)
         corr = g.slice_tr1(prop_b, prop_f, phases, 3)
 
-        g.message("Starting IO")
-        for i, corr_mu in enumerate(corr):
-            out_tag = f"{tag}/FF/q{self.plist[i]}"
-            for j, corr_t in enumerate(corr_mu):
-                out_tag = f"{out_tag}/{my_gammas[j]}"
-                self.output_correlator.write(out_tag, corr_t)
+
+        g.message("Starting IO")    
+        for z, corr_p in enumerate(corr):
+            corr_tag = "%s/FF" % (tag)
+            for i, corr_mu in enumerate(corr_p):
+                p_tag = f"{corr_tag}/pf{self.p}/q{self.q}"
+                for j, corr_t in enumerate(corr_mu):
+                    out_tag = f"{p_tag}/{my_gammas[j]}"
+                    self.output_correlator.write(out_tag, corr_t)
+                    #g.message("Correlator %s\n" % out_tag, corr_t)
+
+    def create_bw_seq(self, inverter, pos, grid, trafo):
 
 
+        src = g.mspincolor(grid)
+        src[:] = 0
+        g.create.point(src, pos)
 
-    def create_bw_seq(self, inverter, prop, trafo):
+        prop = g.eval(inverter * src)
 
         tmp_trafo = g.convert(trafo, prop.grid.precision)
 
@@ -284,7 +291,7 @@ class pion_ff_measurement(pion_measurement):
 
         del prop
 
-        pp = 2.0 * np.pi * np.array(self.p) / prop.grid.fdimensions
+        pp = 2.0 * np.pi * np.array(self.p) / sp_prop.grid.fdimensions
         P = g.exp_ixp(pp)
 
         # sequential solve through t=insertion_time
@@ -295,7 +302,7 @@ class pion_ff_measurement(pion_measurement):
 
         del sp_prop
 
-        src_seq @=  g.gamma["5"]* src_seq
+        src_seq @=  g.gamma[5]* src_seq
         #multiply with complex conjugate phase because it's a backwards prop.
         src_seq @= g.adj(P)* src_seq 
 
@@ -310,7 +317,7 @@ class pion_ff_measurement(pion_measurement):
 
         #This is now in principle B_zx but with the complex conj phase and a missing factor of gamma5 
 
-        return (g.adj(dst_seq)*g.gamma["5"])
+        return (g.adj(dst_seq)*g.gamma[5])
 
 class pion_qpdf_measurement(pion_measurement):
     def __init__(self, parameters):
@@ -329,13 +336,17 @@ class pion_qpdf_measurement(pion_measurement):
         #a list as 2nd argument does not work
         corr = g.slice_tr2(prop_b, prop_f, 3)
 
-        g.message("Starting IO")       
-        for z, corr_mu in enumerate(corr):
-            corr_tag = "%s/QPDF/z%s" % (tag, str(z))
-            out_tag = f"{corr_tag}/{self.pz}"
-            for j, corr_t in enumerate(corr_mu):
-                out_tag = f"{out_tag}/{my_gammas[j]}"
-                self.output_correlator.write(out_tag, corr_t)
+	#This still needs work!
+        g.message("Starting IO")
+        for z, corr_p in enumerate(corr):
+            corr_tag = "%s/FF" % (tag)
+            for i, corr_mu in enumerate(corr_p):
+                p_tag = f"{corr_tag}/pf{self.p}/q{self.q}"
+                for j, corr_t in enumerate(corr_mu):
+                    out_tag = f"{p_tag}/{my_gammas[j]}"
+                    self.output_correlator.write(out_tag, corr_t)
+                    #g.message("Correlator %s\n" % out_tag, corr_t)
+
 
     def create_fw_prop_QPDF(self, prop_f, W):
         g.message("Creating list of W*prop_f for all z")
