@@ -9,9 +9,7 @@ my_gammas = ["5", "T", "T5", "X", "X5", "Y", "Y5", "Z", "Z5", "I", "SXT", "SXY",
 
 class pion_measurement:
     def __init__(self, parameters):
-        self.pzmin = parameters["pzmin"]
-        self.pzmax = parameters["pzmax"]
-        self.plist = range(self.pzmin,self.pzmax)
+        self.plist = parameters["plist"]
         self.width = parameters["width"]
         self.pos_boost = parameters["pos_boost"]
         self.neg_boost = parameters["neg_boost"]
@@ -150,8 +148,8 @@ class pion_measurement:
     ############## make list of complex phases for momentum proj.
     def make_mom_phases(self, grid):    
         one = g.complex(grid)
-        p = [-2 * np.pi * np.array([0, 0, pz, 0]) / grid.fdimensions for pz in self.plist]
-        P = g.exp_ixp(p)
+        pp = [-2 * np.pi * np.array(p) / grid.fdimensions for p in self.plist]
+        P = g.exp_ixp(pp)
         mom = [g.eval(pp*one) for pp in P]
         return mom
 
@@ -214,7 +212,7 @@ class pion_DA_measurement(pion_measurement):
         self.zmax = parameters["zmax"]
         self.pzmin = parameters["pzmin"]
         self.pzmax = parameters["pzmax"]
-        self.plist = range(self.pzmin,self.pzmax)
+        self.plist = [ [0,0, pz, 0] for pz in range(self.pzmin, self.pzmax)]
         self.width = parameters["width"]
         self.pos_boost = parameters["pos_boost"]
         self.neg_boost = parameters["neg_boost"]
@@ -251,13 +249,15 @@ class pion_DA_measurement(pion_measurement):
 
 class pion_ff_measurement(pion_measurement):
     def __init__(self, parameters):
-        self.p = parameters["p"]
+        self.p = parameters["pf"]
         self.q = parameters["q"]
         self.plist = [self.q,] 
         self.t_insert = parameters["t_insert"]
         self.width = parameters["width"]
-        self.pos_boost = parameters["pos_boost"]
-        self.neg_boost = parameters["neg_boost"]
+        self.boost_in = parameters["boost_in"]
+        self.boost_out = parameters["boost_out"]
+        self.pos_boost = self.boost_in
+        self.neg_boost = -1.0*np.array(self.boost_in)
         self.save_propagators = parameters["save_propagators"]
 
     def contract_FF(self, prop_f, prop_b, phases, tag):
@@ -276,31 +276,24 @@ class pion_ff_measurement(pion_measurement):
                     self.output_correlator.write(out_tag, corr_t)
                     #g.message("Correlator %s\n" % out_tag, corr_t)
 
-    def create_bw_seq(self, inverter, pos, grid, trafo):
-
-
-        src = g.mspincolor(grid)
-        src[:] = 0
-        g.create.point(src, pos)
-
-        prop = g.eval(inverter * src)
+    def create_bw_seq(self, inverter, prop, trafo):
 
         tmp_trafo = g.convert(trafo, prop.grid.precision)
 
-        sp_prop = g.create.smear.boosted_smearing(tmp_trafo, prop, w=self.width, boost=self.neg_boost)
+        ss_prop = g.create.smear.boosted_smearing(tmp_trafo, prop, w=self.width, boost=self.boost_out)
 
         del prop
 
-        pp = 2.0 * np.pi * np.array(self.p) / sp_prop.grid.fdimensions
+        pp = 2.0 * np.pi * np.array(self.p) / ss_prop.grid.fdimensions
         P = g.exp_ixp(pp)
 
         # sequential solve through t=insertion_time
         t_op = self.t_insert
-        src_seq = g.lattice(sp_prop)
+        src_seq = g.lattice(ss_prop)
         src_seq[:] = 0
-        src_seq[:, :, :, t_op] = sp_prop[:, :, :, t_op]
+        src_seq[:, :, :, t_op] = ss_prop[:, :, :, t_op]
 
-        del sp_prop
+        del ss_prop
 
         src_seq @=  g.gamma[5]* src_seq
         #multiply with complex conjugate phase because it's a backwards prop.
@@ -308,14 +301,12 @@ class pion_ff_measurement(pion_measurement):
 
 
         #does overwriting on the fly work?
-        src_seq = g.create.smear.boosted_smearing(tmp_trafo, src_seq, w=self.width, boost=self.pos_boost)
+        src_seq = g.create.smear.boosted_smearing(tmp_trafo, src_seq, w=self.width, boost=-1.0*np.array(self.boost_out))
 
         dst_seq = g.lattice(src_seq)
         dst_seq @= inverter * src_seq
 
-        dst_seq = g.create.smear.boosted_smearing(tmp_trafo, g.eval(dst_seq), w=self.width, boost=self.neg_boost)
-
-        #This is now in principle B_zx but with the complex conj phase and a missing factor of gamma5 
+        #This is now in principle B^dagger_zx but with the complex conj phase and a missing factor of gamma5 
 
         return (g.adj(dst_seq)*g.gamma[5])
 
@@ -325,8 +316,10 @@ class pion_qpdf_measurement(pion_measurement):
         self.pz = parameters["pz"]
         self.t_insert = parameters["t_insert"]
         self.width = parameters["width"]
-        self.pos_boost = parameters["pos_boost"]
-        self.neg_boost = parameters["neg_boost"]
+        self.boost_in = parameters["boost_in"]
+        self.boost_out = parameters["boost_out"]
+        self.pos_boost = self.boost_in
+        self.neg_boost = -1.0*np.array(self.boost_in)
         self.save_propagators = parameters["save_propagators"]
 
     #this still needs work!

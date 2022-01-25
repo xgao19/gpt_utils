@@ -5,8 +5,8 @@
 # Calculate pion DA with A2A method
 #
 import gpt as g
-import sys, os
-import numpy as np
+import os
+#import numpy as np
 from gpt_qpdf_utils import pion_DA_measurement
 
 # configure

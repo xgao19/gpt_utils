@@ -5,8 +5,8 @@
 # Calculate pion FF with A2A method
 #
 import gpt as g
-import sys, os
-import numpy as np
+import os
+#import numpy as np
 from gpt_qpdf_utils import pion_ff_measurement
 
 # configure
@@ -28,8 +28,8 @@ groups = {
 
 }
 parameters = {
-    "p" : 2,
-    "q" : 2,
+    "pf" : [1,1,0,0],
+    "q" : [0,1,0,0],
     "t_insert" : 4,
     "width" : 2.2,
     "pos_boost" : [0,0,0],
@@ -199,7 +199,7 @@ for group, job, conf, jid, n in run_jobs:
         del prop_exact_b
 
         g.message("Create seq. backwards prop")
-        prop_b = Measurement.create_bw_seq(prop_exact, pos, U[0].grid, trafo)
+        prop_b = Measurement.create_bw_seq(prop_exact, prop_exact_b, trafo)
 
         g.message("Start FF contractions")
         Measurement.contract_FF(prop_exact_f, prop_b, phases, tag)
@@ -229,7 +229,7 @@ for group, job, conf, jid, n in run_jobs:
             Measurement.propagator_output(tag, prop_sloppy_f, prop_sloppy_b)
 
         g.message("Create seq. backwards prop")
-        prop_b = Measurement.create_bw_seq(prop_exact, pos, U[0].grid, trafo)
+        prop_b = Measurement.create_bw_seq(prop_sloppy, prop_sloppy_b, trafo)
 
         g.message("Start FF contractions")
         Measurement.contract_FF(prop_sloppy_f, prop_b, phases, tag)
@@ -270,7 +270,7 @@ for group, job, conf, jid, n in run_jobs:
             Measurement.propagator_output(tag, prop_sloppy_f, prop_sloppy_b)
 
         g.message("Create seq. backwards prop")
-        prop_b = Measurement.create_bw_seq(prop_exact, pos, U[0].grid, trafo)
+        prop_b = Measurement.create_bw_seq(prop_sloppy, prop_sloppy_b, trafo)
 
         g.message("Start FF contractions")
         Measurement.contract_FF(prop_sloppy_f, prop_b, phases, tag)
