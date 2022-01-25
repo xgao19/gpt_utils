@@ -197,6 +197,11 @@ class pion_measurement:
         
         g.create.point(srcD, pos)
 
+        print(f"grid: {grid}")
+        print(f"pos boost = {self.pos_boost}")
+        print(f"neg boost = {self.neg_boost}")
+
+
 
         srcDm = g.create.smear.boosted_smearing(trafo, srcD, w=self.width, boost=self.neg_boost)
         srcDp = g.create.smear.boosted_smearing(trafo, srcD, w=self.width, boost=self.pos_boost)
@@ -257,7 +262,7 @@ class pion_ff_measurement(pion_measurement):
         self.boost_in = parameters["boost_in"]
         self.boost_out = parameters["boost_out"]
         self.pos_boost = self.boost_in
-        self.neg_boost = -1.0*np.array(self.boost_in)
+        self.neg_boost = [-self.pos_boost[0], -self.pos_boost[1], -self.pos_boost[2]]
         self.save_propagators = parameters["save_propagators"]
 
     def contract_FF(self, prop_f, prop_b, phases, tag):

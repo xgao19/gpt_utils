@@ -32,8 +32,8 @@ parameters = {
     "q" : [0,1,0,0],
     "t_insert" : 4,
     "width" : 2.2,
-    "pos_boost" : [0,0,0],
-    "neg_boost" : [0,0,0],
+    "boost_in" : [0,0,0],
+    "boost_out" : [0,0,0],
     "save_propagators" : True
 }
 
