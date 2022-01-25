@@ -306,7 +306,8 @@ class pion_ff_measurement(pion_measurement):
 
 
         #does overwriting on the fly work?
-        src_seq = g.create.smear.boosted_smearing(tmp_trafo, src_seq, w=self.width, boost=-1.0*np.array(self.boost_out))
+        bw_boost = [-self.boost_out[0], -self.boost_out[1], -self.boost_out[2]]
+        src_seq = g.create.smear.boosted_smearing(tmp_trafo, src_seq, w=self.width, boost=-bw_boost)
 
         dst_seq = g.lattice(src_seq)
         dst_seq @= inverter * src_seq

@@ -195,8 +195,6 @@ for group, job, conf, jid, n in run_jobs:
 
         if(parameters["save_propagators"]):
             Measurement.propagator_output(tag, prop_exact_f, prop_exact_b)
-        
-        del prop_exact_b
 
         g.message("Create seq. backwards prop")
         prop_b = Measurement.create_bw_seq(prop_exact, prop_exact_b, trafo)
