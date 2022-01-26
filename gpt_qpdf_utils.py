@@ -177,7 +177,7 @@ class pion_measurement:
             # g.trace( P *prop_f * g.adj(prop_b) ), 3
         # ) 
 
-        corr = g.slice_tr1(prop_f,g.adj(prop_b),phases, 3)
+        corr = g.slice_trDA(prop_f,g.adj(prop_b),phases, 3) #one could also use trQPDF... doesnt matter
 
         #do correlator output
         corr_tag = "%s/2pt" % (tag)
@@ -237,7 +237,7 @@ class pion_DA_measurement(pion_measurement):
     def contract_DA(self, prop_f, prop_b, phases, tag):
 
         # create and save correlators
-        corr = g.slice_tr1(prop_b,prop_f,phases, 3)
+        corr = g.slice_trDA(prop_b,prop_f,phases, 3)
 
         # corr = g.slice(
         #      g.trace(g.adj(prop_b) * W * g.gamma["Z"] * P * prop_f), 3)
@@ -268,7 +268,7 @@ class pion_ff_measurement(pion_measurement):
     def contract_FF(self, prop_f, prop_b, phases, tag):
 
         #This should work, as both prop are not lists! 
-        corr = g.slice_tr1(prop_b, prop_f, phases, 3)
+        corr = g.slice_trQPDF(prop_b, prop_f, phases, 3)
 
 
         g.message("Starting IO")    
