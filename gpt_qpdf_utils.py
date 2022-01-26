@@ -153,12 +153,12 @@ class pion_measurement:
         mom = [g.eval(pp*one) for pp in P]
         return mom
 
-    # create Wilson lines
+    # create Wilson lines from all --> all + dz for all dz in 0,zmax
     def create_WL(self, U):
         W = []
         W.append(g.qcd.gauge.unit(U[2].grid)[0])
         for dz in range(0, self.zmax):
-            W.append(g.eval(g.cshift(U[2], 2, dz) * W[dz-1]))
+            W.append(g.eval(W[dz-1] * g.cshift(U[2], 2, dz)))
                 
         return W
 
@@ -229,7 +229,7 @@ class pion_DA_measurement(pion_measurement):
         prop_list = [prop_b,]
 
         for z in range(1,self.zmax):
-            prop_list.append(g.eval(g.adj(g.cshift(prop_b,2,z))*W[z]))
+            prop_list.append(g.eval(g.adj(W[z] * g.cshift(prop_b,2,z))))
         
         return prop_list
 
@@ -319,26 +319,25 @@ class pion_ff_measurement(pion_measurement):
 class pion_qpdf_measurement(pion_measurement):
     def __init__(self, parameters):
         self.zmax = parameters["zmax"]
-        self.pz = parameters["pz"]
+        self.p = parameters["pf"]
+        self.q = parameters["q"]
+        self.plist = [self.q,]
         self.t_insert = parameters["t_insert"]
         self.width = parameters["width"]
         self.boost_in = parameters["boost_in"]
         self.boost_out = parameters["boost_out"]
         self.pos_boost = self.boost_in
-        self.neg_boost = -1.0*np.array(self.boost_in)
+        self.neg_boost = [-self.pos_boost[0], -self.pos_boost[1], -self.pos_boost[2]]
         self.save_propagators = parameters["save_propagators"]
 
-    #this still needs work!
-    def contract_QPDF(self, prop_f, prop_b, tag):
+    def contract_QPDF(self, prop_f, prop_b, phases, tag):
+ 
+        corr = g.slice_trQPDF(prop_b, prop_f, phases, 3)
 
-        #This contraction function still needs to be written, as of now
-        #a list as 2nd argument does not work
-        corr = g.slice_tr2(prop_b, prop_f, 3)
 
-	#This still needs work!
         g.message("Starting IO")
         for z, corr_p in enumerate(corr):
-            corr_tag = "%s/FF" % (tag)
+            corr_tag = "%s/QPDF" % (tag)
             for i, corr_mu in enumerate(corr_p):
                 p_tag = f"{corr_tag}/pf{self.p}/q{self.q}"
                 for j, corr_t in enumerate(corr_mu):
@@ -360,34 +359,33 @@ class pion_qpdf_measurement(pion_measurement):
 
         tmp_trafo = g.convert(trafo, prop.grid.precision)
 
-        sp_prop = g.create.smear.boosted_smearing(tmp_trafo, prop, w=self.width, boost=self.pos_boost)
-        
+        ss_prop = g.create.smear.boosted_smearing(tmp_trafo, prop, w=self.width, boost=self.boost_out)
+
         del prop
 
-        p = 2.0 * np.pi * np.array(self.pz) / prop.grid.fdimensions
-        P = g.exp_ixp(p)
+        pp = 2.0 * np.pi * np.array(self.p) / ss_prop.grid.fdimensions
+        P = g.exp_ixp(pp)
 
         # sequential solve through t=insertion_time
         t_op = self.t_insert
-        src_seq = g.lattice(sp_prop)
+        src_seq = g.lattice(ss_prop)
         src_seq[:] = 0
-        src_seq[:, :, :, t_op] = sp_prop[:, :, :, t_op]
+        src_seq[:, :, :, t_op] = ss_prop[:, :, :, t_op]
 
-        del sp_prop
+        del ss_prop
 
-        src_seq @=  g.gamma["5"]* src_seq
+        src_seq @=  g.gamma[5]* src_seq
         #multiply with complex conjugate phase because it's a backwards prop.
-        src_seq @= g.adj(P)* src_seq 
+        src_seq @= g.adj(P)* src_seq
 
 
         #does overwriting on the fly work?
-        src_seq = g.create.smear.boosted_smearing(tmp_trafo, src_seq, w=self.width, boost=self.neg_boost)
+        bw_boost = [-self.boost_out[0], -self.boost_out[1], -self.boost_out[2]]
+        src_seq = g.create.smear.boosted_smearing(tmp_trafo, src_seq, w=self.width, boost=bw_boost)
 
         dst_seq = g.lattice(src_seq)
         dst_seq @= inverter * src_seq
 
-        dst_seq = g.create.smear.boosted_smearing(tmp_trafo, g.eval(dst_seq), w=self.width, boost=self.neg_boost)
+        #This is now in principle B^dagger_zx but with the complex conj phase and a missing factor of gamma5 
 
-        #This is now in principle B_zx but with the complex conj phase and a missing factor of gamma5 
-
-        return (g.adj(dst_seq)*g.gamma["5"])
+        return (g.adj(dst_seq)*g.gamma[5])
