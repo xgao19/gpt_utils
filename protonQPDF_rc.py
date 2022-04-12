@@ -33,6 +33,7 @@ parameters = {
     "t_insert" : 4,
     "width" : 2.2,
     "boost_in" : [0,0,0],
+    "boost_out": [0,0,0],
     "save_propagators" : True
 }
 
@@ -196,45 +197,48 @@ for group, job, conf, jid, n in run_jobs:
         prop_bw = Measurement.create_bw_seq(prop_exact, prop_exact_f, trafo)
 
         g.message("Create list of W * forward prop")
-        prop_f = Measurement.create_fw_prop_QPDF(prop_sloppy_f, W)
+        prop_f = Measurement.create_fw_prop_QPDF(prop_exact_f, W)
 
         g.message("Start QPDF contractions")
-        Measurement.contract_QPDF(prop_exact_f, prop_bw, phases, tag)
+        Measurement.contract_QPDF(prop_f, prop_bw, phases, tag)
         g.message("PQDF done")
 
+        if(parameters["save_propagators"]):
+            Measurement.propagator_output(tag, prop_exact_f)
+
         del prop_exact_f
-        del prop_Q
+        del prop_bw
 
         g.message("STARTING SLOPPY MEASUREMENTS")
     
         g.message("Starting prop sloppy")
         prop_sloppy_f = g.eval(prop_sloppy * srcDp)
         g.message("forward prop done")
-        prop_sloppy_b = g.eval(prop_sloppy * srcDm)
-        g.message("backward prop done")
 
         del srcDp
-        del srcDm
 
         tag = "%s/%s" % ("sloppy", str(pos))
 
+
+
         g.message("Starting 2pt contraction (includes sink smearing)")
-        Measurement.contract_2pt(prop_sloppy_f, prop_sloppy_b, phases, trafo, tag)
+        Measurement.contract_2pt(prop_sloppy_f, phases, trafo, tag)
         g.message("2pt contraction done")
 
-        if(parameters["save_propagators"]):
-            Measurement.propagator_output(tag, prop_sloppy_f, prop_sloppy_b)
-
         g.message("Create seq. backwards prop")
-        prop_b = Measurement.create_bw_seq(prop_sloppy, prop_sloppy_b, trafo)
+        prop_bw = Measurement.create_bw_seq(prop_sloppy, prop_sloppy_f, trafo)
 
         g.message("Create list of W * forward prop")
         prop_f = Measurement.create_fw_prop_QPDF(prop_sloppy_f, W)
+
         g.message("Start QPDF contractions")
-        Measurement.contract_QPDF(prop_f, prop_b, phases, tag)
+        Measurement.contract_QPDF(prop_f, prop_bw, phases, tag)
         g.message("PQDF done")
 
-        del prop_b
+        if(parameters["save_propagators"]):
+            Measurement.propagator_output(tag, prop_sloppy_f)
+
+        del prop_bw
         del prop_sloppy_f
      
     g.message("exact positions done")
@@ -248,37 +252,35 @@ for group, job, conf, jid, n in run_jobs:
         g.message("Starting DA 2pt function")
 
         g.message("Generatring boosted src's")
-        srcDp, srcDm = Measurement.create_src_2pt(pos, trafo, U[0].grid)  
+        srcDp = Measurement.create_src(pos, trafo, U[0].grid)  
 
         g.message("Starting prop sloppy")
         prop_sloppy_f = g.eval(prop_sloppy * srcDp)
         g.message("forward prop done")
-        prop_sloppy_b = g.eval(prop_sloppy * srcDm)
-        g.message("backward prop done")
 
         del srcDp
-        del srcDm
 
         tag = "%s/%s" % ("sloppy", str(pos))
 
+
+
         g.message("Starting 2pt contraction (includes sink smearing)")
-        Measurement.contract_2pt(prop_sloppy_f, prop_sloppy_b, phases, trafo, tag)
+        Measurement.contract_2pt(prop_sloppy_f, phases, trafo, tag)
         g.message("2pt contraction done")
 
-        if(parameters["save_propagators"]):
-            Measurement.propagator_output(tag, prop_sloppy_f, prop_sloppy_b)
-
         g.message("Create seq. backwards prop")
-        prop_b = Measurement.create_bw_seq(prop_sloppy, prop_sloppy_b, trafo)
+        prop_bw = Measurement.create_bw_seq(prop_sloppy, prop_sloppy_f, trafo)
 
         g.message("Create list of W * forward prop")
         prop_f = Measurement.create_fw_prop_QPDF(prop_sloppy_f, W)
+
         g.message("Start QPDF contractions")
-        Measurement.contract_QPDF(prop_f, prop_b, phases, tag)
+        Measurement.contract_QPDF(prop_f, prop_bw, phases, tag)
         g.message("PQDF done")
 
-        del prop_b
-        del prop_sloppy_f   
+        if(parameters["save_propagators"]):
+            Measurement.propagator_output(tag, prop_sloppy_f) 
+    
     
     g.message("sloppy positions done")
         

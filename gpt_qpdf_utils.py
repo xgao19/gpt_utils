@@ -12,7 +12,7 @@ ordered_list_of_gammas = [g.gamma[5], g.gamma["T"], g.gamma["T"]*g.gamma[5],
                                       g.gamma["Y"], g.gamma["Y"]*g.gamma[5],
                                       g.gamma["Z"], g.gamma["Z"]*g.gamma[5], 
                                       g.gamma["I"], g.gamma["SigmaXT"], 
-                                      g.gamma["SigmaXY"], g.gamma["SigmaXZ"] 
+                                      g.gamma["SigmaXY"], g.gamma["SigmaXZ"], 
                                       g.gamma["SigmaZT"]
                             ]
 
@@ -406,6 +406,23 @@ class proton_measurement:
         self.width = parameters["width"]
         self.pos_boost = parameters["pos_boost"]
 
+
+    def set_output_facilites(self, corr_file, prop_file):
+        self.output_correlator = g.corr_io.writer(corr_file)
+
+        if(self.save_propagators):
+            self.output = g.gpt_io.writer(prop_file)
+
+
+    def propagator_output(self, tag, prop_f):
+
+        g.message("Saving forward propagator")
+        prop_f_tag = "%s/%s" % (tag, str(self.pos_boost))
+        self.output.write({prop_f_tag: prop_f})
+        self.output.flush()
+        g.message("Propagator IO done")
+
+
      #make the inverters needed for the 96I lattices
     def make_96I_inverter(self, U, evec_file):
 
@@ -579,12 +596,15 @@ class proton_qpdf_measurement(proton_measurement):
         self.q = parameters["q"]
         self.plist = [self.q,]
         self.pol_list = ["P+_Sz+","P+_Sx+","P+_Sx-"]
-        self.Gamma = parameters["gamma"]
+        #self.Gamma = parameters["gamma"]
         self.t_insert = parameters["t_insert"]
         self.width = parameters["width"]
         self.boost_in = parameters["boost_in"]
         self.boost_out = parameters["boost_out"]
         self.pos_boost = self.boost_in
+        self.save_propagators = parameters["save_propagators"]
+
+
 
     def create_fw_prop_QPDF(self, prop_f, W):
         g.message("Creating list of W*prop_f for all z")
@@ -605,17 +625,17 @@ class proton_qpdf_measurement(proton_measurement):
         P = g.exp_ixp(pp)
 
         # sequential solve through t=insertion_time for all 3 proton polarizations
-        src_seq = [g.mspincolor(grid) for i in range(3)]
+        src_seq = [g.mspincolor(prop.grid) for i in range(3)]
         dst_seq = []
-        g.qcd.baryon.proton_seq_src(prop, src_seq, self.t_insert)
+        #g.qcd.baryon.proton_seq_src(prop, src_seq, self.t_insert)
 
-        dst_tmp = g.lattice(src_seq)
+        dst_tmp = g.mspincolor(prop.grid)
         for i in range(3):
 
-            dst_tmp @= inverter * g.create.smear.boosted_smearing(tmp_trafo, g.gamma[5]* P* g.conj(src_seq[i]), w=self.width, boost=self.boost_out)
-            del src_seq[i]
-            dst_seq.append(dst_tmp)
-
+            dst_tmp @= inverter * g.create.smear.boosted_smearing(tmp_trafo, g.eval(g.gamma[5]* P* g.conj(src_seq[i])), w=self.width, boost=self.boost_out)
+            #del src_seq[i]
+            dst_seq.append(g.eval(g.gamma[5] * g.conj( dst_tmp)))
+        g.message("bw. seq propagator done")
         return dst_seq            
 
 
@@ -624,9 +644,9 @@ class proton_qpdf_measurement(proton_measurement):
         #This and the IO still need work
 
         for pol in self.pol_list:
-            corr = g.slice_trQPDF(g.gamma[5] *g.conj(prop_bw[i]), prop_f, phases, 3)
+            corr = g.slice_trQPDF(prop_bw, prop_f, phases, 3)
 
-            corr_tag = f"{tag}/QPDF/Pol{self.pol_list[pol]}"
+            corr_tag = f"{tag}/QPDF/Pol{pol}"
             for z, corr_p in enumerate(corr):
                 for i, corr_mu in enumerate(corr_p):
                     p_tag = f"{corr_tag}/pf{self.p}/q{self.q}"
