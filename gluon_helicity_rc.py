@@ -122,7 +122,7 @@ del trafo
 
 L = U[0].grid.fdimensions
 
-Measurement = proton_qpdf_measurement(parameters)
+#Measurement = proton_qpdf_measurement(parameters)
 
 
 
@@ -164,27 +164,30 @@ for group, job, conf, jid, n in run_jobs:
 
     root_job = f"{root_output}/{conf}/{job}"
 
-    Measurement.set_output_facilites(f"{root_job}/correlators",f"{root_job}/propagators")
+    #Measurement.set_output_facilites(f"{root_job}/correlators",f"{root_job}/propagators")
 
     #Variant 1
 
-    Ex = g.field_strength(U_prime, 3, 0)
-    Ey = g.field_strength(U_prime, 3, 1)
-    Ez = g.field_strength(U_prime, 3, 2)
+    Ex = g.qcd.gauge.field_strength(U_prime, 3, 0)
+    Ey = g.qcd.gauge.field_strength(U_prime, 3, 1)
+    Ez = g.qcd.gauge.field_strength(U_prime, 3, 2)
 
-    Ax = U_prime[0] - g.adj(U_prime[0]) + g.cshift(U_prime[0],0,-1) + g.adj(g.cshift(U_prime[0],0,-1))
+    Ax = g.eval(U_prime[0] - g.adj(U_prime[0]) + g.cshift(U_prime[0],0,-1) + g.adj(g.cshift(U_prime[0],0,-1)))
     Ax -= g.identity(Ax) * g.trace(Ax) / 3
 
-    Ay = U_prime[1] - g.adj(U_prime[1]) + g.cshift(U_prime[1],1,-1) + g.adj(g.cshift(U_prime[1],1,-1))
+    Ay = g.eval(U_prime[1] - g.adj(U_prime[1]) + g.cshift(U_prime[1],1,-1) + g.adj(g.cshift(U_prime[1],1,-1)))
     Ay -= g.identity(Ay) * g.trace(Ay) / 3
 
-    Az = U_prime[2] - g.adj(U_prime[2]) + g.cshift(U_prime[2],2,-1) + g.adj(g.cshift(U_prime[2],2,-1))
+    Az = g.eval(U_prime[2] - g.adj(U_prime[2]) + g.cshift(U_prime[2],2,-1) + g.adj(g.cshift(U_prime[2],2,-1)))
     Az -= g.identity(Az) * g.trace(Az) / 3
 
 
     Sg_x = g.slice(g.trace(Ey * Az - Ez * Ay), 3)
     Sg_y = g.slice(g.trace(Ez * Ax - Ex * Az), 3)
     Sg_z = g.slice(g.trace(Ex * Ay - Ey * Ax), 3)
+
+
+    g.message(Sg_x)
 
     #do output
 

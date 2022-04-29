@@ -12,7 +12,7 @@ ordered_list_of_gammas = [g.gamma[5], g.gamma["T"], g.gamma["T"]*g.gamma[5],
                                       g.gamma["Y"], g.gamma["Y"]*g.gamma[5],
                                       g.gamma["Z"], g.gamma["Z"]*g.gamma[5], 
                                       g.gamma["I"], g.gamma["SigmaXT"], 
-                                      g.gamma["SigmaXY"], g.gamma["SigmaXZ"] 
+                                      g.gamma["SigmaXY"], g.gamma["SigmaXZ"], 
                                       g.gamma["SigmaZT"]
                             ]
 
