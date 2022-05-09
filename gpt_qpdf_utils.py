@@ -205,17 +205,13 @@ class pion_measurement:
         srcD[:] = 0
         
         g.create.point(srcD, pos)
-
-        print(f"grid: {grid}")
-        print(f"pos boost = {self.pos_boost}")
-        print(f"neg boost = {self.neg_boost}")
-
-
-
+        g.message("point src set")
         srcDm = g.create.smear.boosted_smearing(trafo, srcD, w=self.width, boost=self.neg_boost)
+        g.message("pos. boosted src done")
         srcDp = g.create.smear.boosted_smearing(trafo, srcD, w=self.width, boost=self.pos_boost)
-
+        g.message("neg. boosted src done")
         del srcD
+        g.message("deleted pt. src, now returning")
 
         return srcDp, srcDm
 
