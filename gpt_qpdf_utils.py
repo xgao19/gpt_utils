@@ -529,9 +529,24 @@ class proton_measurement:
         prop_l_exact = l_exact.propagator(light_exact_inverter).grouped(6)
         return prop_l_exact, prop_l_sloppy
     
+    # define transitions between grids (setup)
+    def find_near_null_vectors(w, cgrid):
+        rng = g.random("test_mg")
+        slv = g.algorithms.inverter.fgmres(eps=1e-3, maxiter=50, restartlen=25, checkres=False)(w)
+        basis = g.orthonormalize(rng.cnormal([w.vector_space[0].lattice() for i in range(15)]))
+        null = g.lattice(basis[0])
+        null[:] = 0
+        for b in basis:
+            slv(b, null)
+    
+        # TODO: apply open boundaries, e.g., in this function
+        g.qcd.fermion.coarse.split_chiral(basis)
+        bm = g.block.map(cgrid, basis)
+        bm.orthonormalize()
+        bm.check_orthogonality()
+        return basis
 
-
-    def make_Clover_inverter(self, U):
+    def make_Clover_MG_inverter(self, U):
 
         l_exact = g.qcd.fermion.wilson_clover(
         U,
@@ -546,29 +561,37 @@ class proton_measurement:
             },
         )
 
-        l_sloppy = l_exact.converted(g.single)
+        # l_sloppy = l_exact.converted(g.single)
 
-        # abbreviations
-        i = g.algorithms.inverter
-        p = g.qcd.fermion.preconditioner
+        mg_setup_2lvl = g.algorithms.inverter.multi_grid_setup(block_size=[[2, 2, 2, 2]], projector=self.find_near_null_vectors)
 
-        # define transitions between grids (setup)
-        def find_near_null_vectors(w, cgrid):
-            slv = i.fgmres(eps=1e-3, maxiter=50, restartlen=25, checkres=False)(w)
-            basis = g.orthonormalize(rng.cnormal([w.vector_space[0].lattice() for i in range(15)]))
-            null = g.lattice(basis[0])
-            null[:] = 0
-            for b in basis:
-                slv(b, null)
-        
-            # TODO: apply open boundaries, e.g., in this function
-            g.qcd.fermion.coarse.split_chiral(basis)
-            bm = g.block.map(cgrid, basis)
-            bm.orthonormalize()
-            bm.check_orthogonality()
-            return basis
+        # mg_setup_3lvl = g.algorithms.inverter.multi_grid_setup(
+        #     block_size=[[2, 2, 2, 2], [2, 1, 1, 1]], projector=self.find_near_null_vectors
+        # )
 
+        mg_setup_2lvl_dp = mg_setup_2lvl(l_exact)
 
+        # mg inner solvers
+        # wrapper_solver = i.fgmres({"eps": 1e-1, "maxiter": 10, "restartlen": 5, "checkres": False})
+        smooth_solver = g.algorithms.inverter.fgmres({"eps": 1e-14, "maxiter": 8, "restartlen": 4, "checkres": False})
+        coarsest_solver = g.algorithms.inverter.fgmres({"eps": 5e-2, "maxiter": 50, "restartlen": 25, "checkres": False})
+
+        # mg solver/preconditioner objects
+        mg_2lvl_vcycle_dp = g.algorithms.inverter.sequence(
+            g.algorithms.inverter.coarse_grid(coarsest_solver, *mg_setup_2lvl_dp[0]),
+            g.algorithms.inverter.calculate_residual(
+                "before smoother"
+            ),  # optional since it costs time but helps to tune MG solver
+            smooth_solver,
+            g.algorithms.inverter.calculate_residual("after smoother"),  # optional
+        )
+
+        # outer solver
+        fgmres_params = {"eps": 1e-6, "maxiter": 1000, "restartlen": 20}
+
+        fgmres_outer = g.algorithms.inverter.fgmres(fgmres_params, prec=mg_2lvl_vcycle_dp)
+
+        return fgmres_outer(l_exact)
         
 
     ############## make list of complex phases for momentum proj.
