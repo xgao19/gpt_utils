@@ -563,33 +563,47 @@ class proton_measurement:
 
         # l_sloppy = l_exact.converted(g.single)
 
-        mg_setup_2lvl = g.algorithms.inverter.multi_grid_setup(block_size=[[2, 2, 2, 2]], projector=self.find_near_null_vectors)
+        # mg_setup_2lvl = g.algorithms.inverter.multi_grid_setup(block_size=[[2, 2, 2, 2]], projector=self.find_near_null_vectors)
 
-        # mg_setup_3lvl = g.algorithms.inverter.multi_grid_setup(
-        #     block_size=[[2, 2, 2, 2], [2, 1, 1, 1]], projector=self.find_near_null_vectors
-        # )
+        mg_setup_3lvl = g.algorithms.inverter.multi_grid_setup(
+            block_size=[[2, 2, 2, 2], [2, 1, 1, 1]], projector=self.find_near_null_vectors
+        )
 
-        mg_setup_2lvl_dp = mg_setup_2lvl(l_exact)
+        # mg_setup_2lvl_dp = mg_setup_2lvl(l_exact)
+        mg_setup_3lvl_sp = mg_setup_3lvl(l_exact)
 
         # mg inner solvers
-        # wrapper_solver = i.fgmres({"eps": 1e-1, "maxiter": 10, "restartlen": 5, "checkres": False})
+        wrapper_solver = g.algorithms.inverter.fgmres({"eps": 1e-1, "maxiter": 10, "restartlen": 5, "checkres": False})
         smooth_solver = g.algorithms.inverter.fgmres({"eps": 1e-14, "maxiter": 8, "restartlen": 4, "checkres": False})
         coarsest_solver = g.algorithms.inverter.fgmres({"eps": 5e-2, "maxiter": 50, "restartlen": 25, "checkres": False})
 
-        # mg solver/preconditioner objects
-        mg_2lvl_vcycle_dp = g.algorithms.inverter.sequence(
-            g.algorithms.inverter.coarse_grid(coarsest_solver, *mg_setup_2lvl_dp[0]),
-            g.algorithms.inverter.calculate_residual(
-                "before smoother"
-            ),  # optional since it costs time but helps to tune MG solver
-            smooth_solver,
-            g.algorithms.inverter.calculate_residual("after smoother"),  # optional
+        # lvl 2 mg solver/preconditioner objects
+        # mg_2lvl_vcycle_dp = g.algorithms.inverter.sequence(
+        #     g.algorithms.inverter.coarse_grid(coarsest_solver, *mg_setup_2lvl_dp[0]),
+        #     g.algorithms.inverter.calculate_residual(
+        #         "before smoother"
+        #     ),  # optional since it costs time but helps to tune MG solver
+        #     smooth_solver,
+        #     g.algorithms.inverter.calculate_residual("after smoother"),  # optional
+        # )
+
+        mg_3lvl_kcycle_sp = g.algorithms.inverter.sequence(
+        g.algorithms.inverter.coarse_grid(
+            wrapper_solver.modified(
+                prec=g.algorithms.inverter.sequence(
+                    g.algorithms.inverter.coarse_grid(coarsest_solver, *mg_setup_3lvl_sp[1]), smooth_solver
+                )
+            ),
+            *mg_setup_3lvl_sp[0],
+        ),
+        smooth_solver,
         )
 
         # outer solver
         fgmres_params = {"eps": 1e-6, "maxiter": 1000, "restartlen": 20}
 
-        fgmres_outer = g.algorithms.inverter.fgmres(fgmres_params, prec=mg_2lvl_vcycle_dp)
+        # fgmres_outer = g.algorithms.inverter.fgmres(fgmres_params, prec=mg_2lvl_vcycle_dp)
+        fgmres_outer = g.algorithms.inverter.fgmres(fgmres_params, prec=mg_3lvl_kcycle_sp)
 
         return fgmres_outer(l_exact)
         
