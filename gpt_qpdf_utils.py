@@ -530,7 +530,7 @@ class proton_measurement:
         return prop_l_exact, prop_l_sloppy
     
     # define transitions between grids (setup)
-    def find_near_null_vectors(w, cgrid):
+    def find_near_null_vectors(self, w, cgrid):
         rng = g.random("test_mg")
         slv = g.algorithms.inverter.fgmres(eps=1e-3, maxiter=50, restartlen=25, checkres=False)(w)
         basis = g.orthonormalize(rng.cnormal([w.vector_space[0].lattice() for i in range(15)]))
