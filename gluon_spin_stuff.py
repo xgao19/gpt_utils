@@ -6,6 +6,7 @@
 #
 import gpt as g
 import os
+import numpy as np
 from gpt_qpdf_utils import proton_qpdf_measurement
 
 # configure
@@ -125,7 +126,6 @@ L = U[0].grid.fdimensions
 #Measurement = proton_qpdf_measurement(parameters)
 
 
-
 # show available memory
 g.mem_report(details=False)
 g.message(
@@ -166,12 +166,6 @@ for group, job, conf, jid, n in run_jobs:
 
     #Measurement.set_output_facilites(f"{root_job}/correlators",f"{root_job}/propagators")
 
-    #Variant 1
-
-    Ex = g.qcd.gauge.field_strength(U_prime, 3, 0)
-    Ey = g.qcd.gauge.field_strength(U_prime, 3, 1)
-    Ez = g.qcd.gauge.field_strength(U_prime, 3, 2)
-
     Ax = g.eval(U_prime[0] - g.adj(U_prime[0]) + g.cshift(U_prime[0],0,-1) + g.adj(g.cshift(U_prime[0],0,-1)))
     Ax -= g.identity(Ax) * g.trace(Ax) / 3
 
@@ -181,49 +175,15 @@ for group, job, conf, jid, n in run_jobs:
     Az = g.eval(U_prime[2] - g.adj(U_prime[2]) + g.cshift(U_prime[2],2,-1) + g.adj(g.cshift(U_prime[2],2,-1)))
     Az -= g.identity(Az) * g.trace(Az) / 3
 
-
-    Sg_x = g.slice(g.trace(Ey * Az - Ez * Ay), 3)
-    Sg_y = g.slice(g.trace(Ez * Ax - Ex * Az), 3)
-    Sg_z = g.slice(g.trace(Ex * Ay - Ey * Ax), 3)
+    At = g.eval(U_prime[3] - g.adj(U_prime[3]) + g.cshift(U_prime[3],3,-1) + g.adj(g.cshift(U_prime[3],3,-1)))
+    At -= g.identity(At) * g.trace(At) / 3
 
 
-    g.message(Sg_x)
+    #O321 is the naming convention from Minkowski space. In the Euklidean space version of Grid t=3,
+    # so Mikowski O321 = Euklidean O210!
+    O321 = g.slice(g.trace(g.qcd.gauge.field_strength(U_prime, 2, 1)* Ax - g.qcd.gauge.field_strength(U_prime, 2, 0)* Ay ) , 3)
+    O021 = g.slice(g.trace(g.qcd.gauge.field_strength(U_prime, 3, 1)* Ax - g.qcd.gauge.field_strength(U_prime, 3, 0)* Ay ) , 3)
+    B_dot_A = np.array(O321) + np.array(g.slice(g.trace(g.qcd.gauge.field_strength(U_prime, 1, 0) * Az) , 3))
 
+    g.message(B_dot_A)
     #do output
-
-    # #Variant 2
-
-    # zmax = 20
-
-    # dual_F3 = [] 
-    # dual_F3[0] = 0.5 * (g.field_strength(U_prime, 2, 1) - g.field_strength(U_prime, 1, 2))
-    # dual_F3[1] = 0.5 * (g.field_strength(U_prime, 0, 2) - g.field_strength(U_prime, 2, 0))
-    # dual_F3[2] = 0.5 * (g.field_strength(U_prime, 1, 0) - g.field_strength(U_prime, 0, 1))
-
-    # for z in range(zmax):
-
-    #     F3 = []
-    #     for i in range(3):
-    #         F3[i].append(g.field_strength(g.cshift(U_prime, 3, z), 3, i))
-
-    #     corr = g.slice(g.trace((F3[0]+F3[1]+F3[2])*W[z]*(dual_F3[0]+dual_F3[1]+dual_F3[2])),3)
-
-    #     #do output
-
-        
-
-        
-
-
-
-    
-
-
-
-    
-
-
-
-     
-
-
