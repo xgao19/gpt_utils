@@ -528,7 +528,48 @@ class proton_measurement:
         prop_l_sloppy = l_exact.propagator(light_sloppy_inverter).grouped(6)
         prop_l_exact = l_exact.propagator(light_exact_inverter).grouped(6)
         return prop_l_exact, prop_l_sloppy
+    
 
+
+    def make_Clover_inverter(self, U):
+
+        l_exact = g.qcd.fermion.wilson_clover(
+        U,
+        {
+            "kappa": 0.12655,
+            "csw_r": 1.0372,
+            "csw_t": 1.0372,
+            "xi_0": 1,
+            "nu": 1,
+            "isAnisotropic": False,
+            "boundary_phases": [1.0, 1.0, 1.0, 1.0],
+            },
+        )
+
+        l_sloppy = l_exact.converted(g.single)
+
+        # abbreviations
+        i = g.algorithms.inverter
+        p = g.qcd.fermion.preconditioner
+
+        # define transitions between grids (setup)
+        def find_near_null_vectors(w, cgrid):
+            slv = i.fgmres(eps=1e-3, maxiter=50, restartlen=25, checkres=False)(w)
+            basis = g.orthonormalize(rng.cnormal([w.vector_space[0].lattice() for i in range(15)]))
+            null = g.lattice(basis[0])
+            null[:] = 0
+            for b in basis:
+                slv(b, null)
+        
+            # TODO: apply open boundaries, e.g., in this function
+            g.qcd.fermion.coarse.split_chiral(basis)
+            bm = g.block.map(cgrid, basis)
+            bm.orthonormalize()
+            bm.check_orthogonality()
+            return basis
+
+
+        
 
     ############## make list of complex phases for momentum proj.
     def make_mom_phases(self, grid):    
@@ -623,7 +664,7 @@ class proton_qpdf_measurement(proton_measurement):
         # sequential solve through t=insertion_time for all 3 proton polarizations
         src_seq = [g.mspincolor(prop.grid) for i in range(3)]
         dst_seq = []
-        #g.qcd.baryon.proton_seq_src(prop, src_seq, self.t_insert)
+        g.qcd.baryon.proton_seq_src(prop, src_seq, self.t_insert)
 
         dst_tmp = g.mspincolor(prop.grid)
         for i in range(3):
