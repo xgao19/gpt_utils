@@ -6,6 +6,7 @@
 #
 import gpt as g
 import os
+import numpy as np
 from gpt_qpdf_utils import proton_qpdf_measurement
 
 # configure
@@ -16,12 +17,12 @@ root_output ="."
 groups = {
     "booster_batch_0": {
         "confs": [
-            "1056",
-            "1068",
-            "1080",
+            "420",
+            "1260",
+            "1272",
         ],
 	"evec_fmt": "/p/project/chbi21/gpt_test/96I/lanczos.output",
-        "conf_fmt": "/gpfs/alpine/lgt104/proj-shared/scior/nersc_l6464f21b7130m00119m0322a/l6464f21b7130m00119m0322a.%s",
+        "conf_fmt": "/p/project/chbi21/gpt_test/96I/ckpoint_lat.%s",
     },
 
 }
@@ -36,7 +37,7 @@ parameters = {
     "save_propagators" : True
 }
 
-hyp=True
+hyp=False
 flow=False
 n_hyp=3
 n_flow=3
@@ -108,15 +109,17 @@ run_jobs = eval(g.broadcast(0, run_jobs).decode("utf-8"))
 conf = run_jobs[0][2]
 group = run_jobs[0][0]
 
-
+g.message(f"conf = {conf}")
 ##### small dummy used for testing
-grid = g.grid([16,16,16,16], g.double)
+#grid = g.grid([16,16,16,16], g.double)
 rng = g.random("seed text")
-U = g.qcd.gauge.random(grid, rng)
+#U = g.qcd.gauge.random(grid, rng)
 
 
 # loading gauge configuration
-# U = g.load(groups[group]["conf_fmt"] % conf)
+path = groups[group]["conf_fmt"] % conf
+g.message(f"configpath = {path}")
+U = g.convert(g.load(groups[group]["conf_fmt"] % conf), g.double)
 g.message("finished loading gauge config")
 
 g.message("Doing some kind of smearing")
@@ -135,22 +138,9 @@ L = U[0].grid.fdimensions
 
 #do gauge fixing
 g.message("Starting gauge fixing to Coulomb gauge")
-opt = g.algorithms.optimize.non_linear_cg(maxiter=500, eps=1e-9, step=0.1)
-V = g.identity(U[0])
-rng.element(V)
-
-#get gf functional for U, even though it say's Landau we actually fix to Coulomb (t-component of U not an input to functional)
-l = g.qcd.gauge.fix.landau([U[0], U[1], U[2]])
-l.assert_gradient_error(rng, V, V, 1e-3, 1e-8)
-
-#fixing
-opt(l)([V], [V])
-
-#V gauge transformation matrices
+U_fixed, V = g.gauge_fix(U, maxiter=500)
 V = g.project(V, "defect")
 
-U_fixed = g.qcd.gauge.transformed(U, V)
-U_fixed = [g.project(u, "defect") for u in U_fixed]
 g.message(f"gauge fixing done")
 
 import sys
@@ -158,12 +148,12 @@ import sys
 
 Measurement = proton_qpdf_measurement(parameters)
 
-#prop_exact, prop_sloppy, pin = Measurement.make_96I_inverter(U, groups[group]["evec_fmt"])
+inv_exact, inv_sloppy, pin = Measurement.make_DWF_inverter(U, groups[group]["evec_fmt"])
 
 #inv_exact, inv_sloppy = Measurement.make_debugging_inverter(U)
 
-inv_exact = Measurement.make_Clover_MG_inverter(U)
-inv_sloppy = Measurement.make_Clover_MG_inverter(U)
+#inv_exact = Measurement.make_Clover_MG_inverter(U)
+#inv_sloppy = Measurement.make_Clover_MG_inverter(U)
 
 
 phases = Measurement.make_mom_phases(U[0].grid)
@@ -280,7 +270,7 @@ for group, job, conf, jid, n in run_jobs:
     
     g.message("sloppy positions done")
    
-#del pin
+    del pin
 
     #Definition of gauge potential A_mu is taken from arXiv:1609.05937. Factor 1/(4iga) is NOT included here!
 
@@ -312,5 +302,7 @@ for group, job, conf, jid, n in run_jobs:
     O021 = g.slice(g.trace(g.qcd.gauge.field_strength(U, 3, 1)* Ax - g.qcd.gauge.field_strength(U, 3, 0)* Ay ) , 3)
     B_dot_A = np.array(O321) + np.array(g.slice(g.trace(g.qcd.gauge.field_strength(U, 1, 0) * Az) , 3))
 
-
+    g.message(f"O321 = {O321}")
+    g.message(f"O021 = {O021}")
+    g.message(f"B dot A = {B_dot_A}")
 

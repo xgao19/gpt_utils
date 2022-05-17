@@ -419,8 +419,8 @@ class proton_measurement:
         g.message("Propagator IO done")
 
 
-     #make the inverters needed for the 96I lattices
-    def make_96I_inverter(self, U, evec_file):
+     #make the inverters needed for the DWF lattices
+    def make_DWF_inverter(self, U, evec_file):
 
         l_exact = g.qcd.fermion.mobius(
             U,
