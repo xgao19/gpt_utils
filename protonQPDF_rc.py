@@ -107,12 +107,12 @@ group = run_jobs[0][0]
 
 
 ##### small dummy used for testing
-grid = g.grid([8,8,8,8], g.double)
+#grid = g.grid([8,8,8,8], g.double)
 rng = g.random("seed text")
-U = g.qcd.gauge.random(grid, rng)
+#U = g.qcd.gauge.random(grid, rng)
 
 # loading gauge configuration
-# U = g.load(groups[group]["conf_fmt"] % conf)
+U = g.load(groups[group]["conf_fmt"] % conf)
 g.message("finished loading gauge config")
 
 
@@ -121,19 +121,22 @@ g.message("finished loading gauge config")
 U_prime, trafo = g.gauge_fix(U, maxiter=500)
 del U_prime
 
+
 L = U[0].grid.fdimensions
 
 Measurement = proton_qpdf_measurement(parameters)
 
-#prop_exact, prop_sloppy, pin = Measurement.make_96I_inverter(U, groups[group]["evec_fmt"])
+prop_exact, prop_sloppy, pin = Measurement.make_DWF_inverter(U, groups[group]["evec_fmt"])
 
-prop_exact, prop_sloppy = Measurement.make_debugging_inverter(U)
+g.mem_report(details=True)
+
+#prop_exact, prop_sloppy = Measurement.make_debugging_inverter(U)
 
 phases = Measurement.make_mom_phases(U[0].grid)
 
 
 # show available memory
-g.mem_report(details=False)
+#g.mem_report(details=True)
 g.message(
     """
 ================================================================================

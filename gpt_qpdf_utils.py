@@ -701,8 +701,10 @@ class proton_qpdf_measurement(proton_measurement):
         # sequential solve through t=insertion_time for all 3 proton polarizations
         src_seq = [g.mspincolor(prop.grid) for i in range(3)]
         dst_seq = []
+        g.mem_report(details=True)
+        g.message("starting diquark contractions")
         g.qcd.baryon.proton_seq_src(prop, src_seq, self.t_insert)
-
+        g.message("diquark contractions done")
         dst_tmp = g.mspincolor(prop.grid)
         for i in range(3):
 
