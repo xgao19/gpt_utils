@@ -16,32 +16,32 @@ root_output ="."
 groups = {
     "booster_batch_0": {
         "confs": [
-            "420",
+            "1260",
             "1960",
             "2000",
         ],
         #"evec_fmt": "/p/scratch/gm2dwf/evecs/96I/%s/lanczos.output",
-	    "evec_fmt": "/p/project/chbi21/gpt_test/96I/lanczos.output",
-        "conf_fmt": "/p/project/chbi21/gpt_test/96I/ckpoint_lat.%s",
+	    "evec_fmt": "/p/scratch/chbi21/scior/64I/ckpoint_lat.1260.evecs",
+        "conf_fmt": "/p/scratch/chbi21/scior/64I/ckpoint_lat.Coulomb.%s",
     },
 
 }
 parameters = {
     "pf" : [1,1,0,0],
     "q" : [0,1,0,0],
-    "zmax" : 4,
+    "zmax" : 60,
     "t_insert" : 4,
     "width" : 2.2,
     "boost_in" : [0,0,0],
     "boost_out": [0,0,0],
-    "save_propagators" : True
+    "save_propagators" : False
 }
 
 
 jobs = {
     "booster_exact_0": {
         "exact": 1,
-        "sloppy": 0,
+        "sloppy": 1,
         "low": 0,
     },  
     "booster_sloppy_0": {
@@ -126,9 +126,9 @@ L = U[0].grid.fdimensions
 
 Measurement = proton_qpdf_measurement(parameters)
 
-prop_exact, prop_sloppy, pin = Measurement.make_DWF_inverter(U, groups[group]["evec_fmt"])
+prop_exact, prop_sloppy, pin = Measurement.make_64I_inverter(U, groups[group]["evec_fmt"])
 
-g.mem_report(details=True)
+g.mem_report(details=False)
 
 #prop_exact, prop_sloppy = Measurement.make_debugging_inverter(U)
 
@@ -189,6 +189,8 @@ for group, job, conf, jid, n in run_jobs:
         g.message("Starting prop exact")
         prop_exact_f = g.eval(prop_exact * srcDp)
         g.message("forward prop done")
+        g.message(f"prop grid: {prop_exact_f.grid}")
+        g.message(f"trafo grid: {trafo.grid}")
 
         tag = "%s/%s" % ("exact", str(pos)) 
 
@@ -202,6 +204,7 @@ for group, job, conf, jid, n in run_jobs:
         g.message("Create list of W * forward prop")
         prop_f = Measurement.create_fw_prop_QPDF(prop_exact_f, W)
 
+        g.mem_report(details=False)
         g.message("Start QPDF contractions")
         Measurement.contract_QPDF(prop_f, prop_bw, phases, tag)
         g.message("PQDF done")
@@ -234,6 +237,7 @@ for group, job, conf, jid, n in run_jobs:
         g.message("Create list of W * forward prop")
         prop_f = Measurement.create_fw_prop_QPDF(prop_sloppy_f, W)
 
+        g.mem_report(details=False)
         g.message("Start QPDF contractions")
         Measurement.contract_QPDF(prop_f, prop_bw, phases, tag)
         g.message("PQDF done")
@@ -287,5 +291,5 @@ for group, job, conf, jid, n in run_jobs:
     
     g.message("sloppy positions done")
         
-#del pin
+del pin
 

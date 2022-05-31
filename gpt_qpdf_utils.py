@@ -49,12 +49,15 @@ class pion_measurement:
         l_exact = g.qcd.fermion.mobius(
             U,
             {
+                #96I params
                 "mass": 0.00054,
                 "M5": 1.8,
                 "b": 1.5,
                 "c": 0.5,
                 "Ls": 12,
-                "boundary_phases": [1.0, 1.0, 1.0, -1.0],},
+                "boundary_phases": [1.0, 1.0, 1.0, -1.0],
+            },
+
         )
 
         l_sloppy = l_exact.converted(g.single)
@@ -124,7 +127,16 @@ class pion_measurement:
         l_exact = g.qcd.fermion.mobius(
             U,
             {
-                "mass": 0.00054,
+                #96I params
+                #"mass": 0.00054,
+                #"M5": 1.8,
+                #"b": 1.5,
+                #"c": 0.5,
+                #"Ls": 12,
+                #"boundary_phases": [1.0, 1.0, 1.0, -1.0],},
+
+                #64I params
+                "mass": 0.000678,
                 "M5": 1.8,
                 "b": 1.5,
                 "c": 0.5,
@@ -134,13 +146,13 @@ class pion_measurement:
 
         l_sloppy = l_exact.converted(g.single)
 
-        light_innerL_inverter = g.algorithms.inverter.preconditioned(g.qcd.fermion.preconditioner.eo1_ne(parity=g.odd), g.algorithms.inverter.cg(eps = 1e-8, maxiter = 200))
-        light_innerH_inverter = g.algorithms.inverter.preconditioned(g.qcd.fermion.preconditioner.eo1_ne(parity=g.odd), g.algorithms.inverter.cg(eps = 1e-8, maxiter = 300))
+        light_innerL_inverter = g.algorithms.inverter.preconditioned(g.qcd.fermion.preconditioner.eo1_ne(parity=g.odd), g.algorithms.inverter.cg(eps = 1e-8, maxiter = 50))
+        light_innerH_inverter = g.algorithms.inverter.preconditioned(g.qcd.fermion.preconditioner.eo1_ne(parity=g.odd), g.algorithms.inverter.cg(eps = 1e-8, maxiter = 70))
 
         light_exact_inverter = g.algorithms.inverter.defect_correcting(
             g.algorithms.inverter.mixed_precision(light_innerH_inverter, g.single, g.double),
             eps=1e-8,
-            maxiter=10,
+            maxiter=4,
         )
 
         light_sloppy_inverter = g.algorithms.inverter.defect_correcting(
@@ -420,28 +432,30 @@ class proton_measurement:
 
 
      #make the inverters needed for the DWF lattices
-    def make_DWF_inverter(self, U, evec_file):
+    def make_64I_inverter(self, U, evec_file):
 
+        # define fermions
         l_exact = g.qcd.fermion.mobius(
             U,
             {
-                "mass": 0.00054,
+                "mass": 0.0006203,
                 "M5": 1.8,
                 "b": 1.5,
                 "c": 0.5,
                 "Ls": 12,
-                "boundary_phases": [1.0, 1.0, 1.0, -1.0],},
+                "boundary_phases": [1.0, 1.0, 1.0, 1.0],
+            },
         )
 
         l_sloppy = l_exact.converted(g.single)
 
         eig = g.load(evec_file, grids=l_sloppy.F_grid_eo)
-        # ## pin coarse eigenvectors to GPU memory
+
+        # pin coarse eigenvectors to GPU memory
         pin = g.pin(eig[1], g.accelerator)
 
-
         light_innerL_inverter = g.algorithms.inverter.preconditioned(
-            g.qcd.fermion.preconditioner.eo1_ne(parity=g.odd),
+            g.qcd.fermion.preconditioner.eo2_ne(parity=g.odd),
             g.algorithms.inverter.sequence(
                 g.algorithms.inverter.coarse_deflate(
                     eig[1],
@@ -459,7 +473,7 @@ class proton_measurement:
         )
 
         light_innerH_inverter = g.algorithms.inverter.preconditioned(
-            g.qcd.fermion.preconditioner.eo1_ne(parity=g.odd),
+            g.qcd.fermion.preconditioner.eo2_ne(parity=g.odd),
             g.algorithms.inverter.sequence(
                 g.algorithms.inverter.coarse_deflate(
                     eig[1],
@@ -476,6 +490,7 @@ class proton_measurement:
             ),
         )
 
+
         light_exact_inverter = g.algorithms.inverter.defect_correcting(
             g.algorithms.inverter.mixed_precision(light_innerH_inverter, g.single, g.double),
             eps=1e-8,
@@ -488,10 +503,8 @@ class proton_measurement:
             maxiter=2,
         )
 
-
-        ############### final inverter definitions
-        prop_l_sloppy = l_exact.propagator(light_sloppy_inverter).grouped(6)
-        prop_l_exact = l_exact.propagator(light_exact_inverter).grouped(6)
+        prop_l_sloppy = l_exact.propagator(light_sloppy_inverter).grouped(4)
+        prop_l_exact = l_exact.propagator(light_exact_inverter).grouped(4)
 
         return prop_l_exact, prop_l_sloppy, pin
 
@@ -701,7 +714,7 @@ class proton_qpdf_measurement(proton_measurement):
         # sequential solve through t=insertion_time for all 3 proton polarizations
         src_seq = [g.mspincolor(prop.grid) for i in range(3)]
         dst_seq = []
-        g.mem_report(details=True)
+        #g.mem_report(details=True)
         g.message("starting diquark contractions")
         g.qcd.baryon.proton_seq_src(prop, src_seq, self.t_insert)
         g.message("diquark contractions done")
