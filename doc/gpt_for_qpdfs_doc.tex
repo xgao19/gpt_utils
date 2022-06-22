@@ -459,5 +459,16 @@ tensor $F^{\mu \nu}$. Which in turn is determined by using the clover plaquette 
 \end{equation}
 
 \section{Correlator Format and IO}
+At the moment IO is structured to that every job will either create or use an existing subfolder with the config. number. Inside this folder there will be again
+subfolders named after the jobs tags. Inside are these subfolders are the correlator files. So far, we use the binary format that is supplied with GPT. You
+can read a correlator file by using the code below
+\lstinputlisting[language=Python,basicstyle=\footnotesize,commentstyle=\color{mygreen},numbers=left,numberstyle=\tiny\color{mygray},]{IO.py}
+which is quite straight forward to use. If you want to read the data on a machine without compiling gpt there first you can just use the code from the "reader" 
+class in gpt/lib/gpt/core/io/corr\_io.py 
+
+\textbf{Note:} The correlators are not "aligned", i.e. the correlator starts not the on the time slice of the source but at t=0. If you want to combine data from
+measurements with different source positions you have to align the data first. Which is always possible because the source position is saved in the tags.
+
+Also note the warning from the beginning of this file: correlators do not contain the fourier phase factor from the source.
 
 \end{document}
