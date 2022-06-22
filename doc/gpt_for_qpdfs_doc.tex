@@ -32,6 +32,11 @@ ordered list containing tags for labeling the gamma-matrix channels in the corre
 The basic functionalities for the measurement of pion related correlators are defined in the pion\_measurement
 base class. All other pion measurement classes will be derived from the pion\_measurement class and inherit it's
 members.
+
+\textbf{WARNINING:} So far, all correlators only contain the fourier phase factor coming from the sink not the source! I did not find a elegant way to include the
+fourier factor coming from the source, as there seems to be no multiplication of a complex number with the basic fields. However, you can always include it in the 
+analysis as every source position is saved with the correlators.
+
 \subsection{class pion\_measurement}
 \begin{itemize}
     \item Data members: These are basically all parameters for the measurements:
@@ -453,5 +458,6 @@ tensor $F^{\mu \nu}$. Which in turn is determined by using the clover plaquette 
     A_\mu(x) = \left[ \frac{U_\mu(x)- U_\mu^\dagger(x) - U_\mu(x - a \hat \mu) + U_\mu^\dagger(x - a \hat \mu)}{4 i} \right]_\text{traceless}
 \end{equation}
 
+\section{Correlator Format and IO}
 
 \end{document}
