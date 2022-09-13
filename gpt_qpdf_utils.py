@@ -277,11 +277,11 @@ class TMD_WF_measurement(pion_measurement):
         self.b_z = parameters["b_z"]
         self.pzmin = parameters["pzmin"]
         self.pzmax = parameters["pzmax"]
-        self.plist = [ [0,0, pz, 0], for pz in range(self.pzmin,self.pzmax)]
+        self.plist = [ [0,0, pz, 0] for pz in range(self.pzmin,self.pzmax)]
         self.width = parameters["width"]
         self.pos_boost = parameters["pos_boost"]
         self.neg_boost = parameters["neg_boost"]
-        self.save_propagators = paremters["save_propagators"]
+        self.save_propagators = parameters["save_propagators"]
 
     def contract_TMD(self, prop_f, prop_b, phases, tag):
 

@@ -3,7 +3,7 @@
 import gpt as g
 import os
 
-from gpt_qpdf_utils import TMD_measurement
+from gpt_qpdf_utils import TMD_WF_measurement
 
 root_output  = "."
 
