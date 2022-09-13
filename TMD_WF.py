@@ -1,59 +1,51 @@
 #!/usr/bin/env python3
-#
-# Authors: Christoph Lehner 2020 / Philipp Scior 2021
-#
-# Calculate proton QPDF with A2A method
-#
+
 import gpt as g
 import os
-from gpt_qpdf_utils import proton_qpdf_measurement
 
-# configure
-# root_output = "/p/project/chbi21/gpt_test/DA"
-root_output ="."
+from gpt_qpdf_utils import TMD_measurement
 
-# 420, 500, 580
+root_output  = "."
+
+
 groups = {
-    "booster_batch_0": {
+    "polaris_batch_0": {
         "confs": [
-            "1260",
-         #   "1960",
-         #   "2000",
+            "100"
         ],
-        #"evec_fmt": "/p/scratch/gm2dwf/evecs/96I/%s/lanczos.output",
-	    "evec_fmt": "/p/scratch/chbi21/scior/64I/ckpoint_lat.1260.evecs",
-        "conf_fmt": "/p/scratch/chbi21/scior/64I/ckpoint_lat.Coulomb.%s",
+        "evec_fmt": "~/64I/lanczos.output",
+        "conf_fmt":  "~/64I/ckpoint_lat.%s",
     },
-
 }
+
 parameters = {
-    "pf" : [1,1,0,0],
-    "q" : [0,1,0,0],
-    "zmax" : 60,
-    "t_insert" : 4,
+    "zmax" : 5,
+    "eta" : 4,
+    "b_perp" : 4,
+    "b_z" : 1,
+    "pzmin" : 0,
+    "pzmax" : 5,
     "width" : 2.2,
-    "boost_in" : [0,0,0],
-    "boost_out": [0,0,0],
-    "save_propagators" : False
+    "pos_boost" : [0,0,0],
+    "neg_boost" : [0,0,0],
+    "save_propagators" : True
 }
 
 
 jobs = {
-    "booster_exact_0": {
+    "polaris_exact_0": {
         "exact": 1,
-        "sloppy": 1,
+        "sloppy": 0,
         "low": 0,
-    },  
-    "booster_sloppy_0": {
+    },
+    "polaris_sloppy_0": {
         "exact": 0,
         "sloppy": 10,
         "low": 0,
     }, 
 }
 
-
 jobs_per_run = g.default.get_int("--gpt_jobs", 1)
-
 
 
 # find jobs for this run
@@ -97,23 +89,20 @@ else:
     run_jobs = bytes()
 run_jobs = eval(g.broadcast(0, run_jobs).decode("utf-8"))
 
-# every node now knows what to do
-
-
-
-# configuration needs to be the same for all jobs, so load eigenvectors and configuration
 conf = run_jobs[0][2]
 group = run_jobs[0][0]
 
 
 ##### small dummy used for testing
-grid = g.grid([16,16,16,16], g.double)
+grid = g.grid([8,8,8,8], g.double)
 rng = g.random("seed text")
 U = g.qcd.gauge.random(grid, rng)
 
 # loading gauge configuration
 #U = g.load(groups[group]["conf_fmt"] % conf)
-#g.message("finished loading gauge config")
+g.message("finished loading gauge config")
+
+
 
 
 # do gauge fixing
@@ -121,29 +110,26 @@ U = g.qcd.gauge.random(grid, rng)
 U_prime, trafo = g.gauge_fix(U, maxiter=500)
 del U_prime
 
-
 L = U[0].grid.fdimensions
 
-Measurement = proton_qpdf_measurement(parameters)
 
-#prop_exact, prop_sloppy, pin = Measurement.make_64I_inverter(U, groups[group]["evec_fmt"])
 
-g.mem_report(details=False)
+Measurement = TMD_WF_measurement(parameters)
 
 prop_exact, prop_sloppy = Measurement.make_debugging_inverter(U)
 
 phases = Measurement.make_mom_phases(U[0].grid)
 
-
 # show available memory
-#g.mem_report(details=True)
+g.mem_report(details=False)
 g.message(
     """
 ================================================================================
-       QPDF run on booster ;  this run will attempt:
+       TMD run on polaris ;  this run will attempt:
 ================================================================================
 """
 )
+
 # per job
 for group, job, conf, jid, n in run_jobs:
     g.message(
@@ -155,7 +141,7 @@ for group, job, conf, jid, n in run_jobs:
     )
 
     job_seed = job.split("_correlated")[0]
-    rng = g.random(f"QPDF-ensemble-{conf}-{job_seed}")
+    rng = g.random(f"TMD-ensemble-{conf}-{job_seed}")
 
     source_positions_sloppy = [
         [rng.uniform_int(min=0, max=L[i] - 1) for i in range(4)]
@@ -175,78 +161,74 @@ for group, job, conf, jid, n in run_jobs:
 
     Measurement.set_output_facilites(f"{root_job}/correlators",f"{root_job}/propagators")
 
-    g.message("Starting Wilson loops")
-    W = Measurement.create_WL(U)
+    g.message("Starting modified Wilson loops")
+    W = Measurement.create_mod_WL(U)
 
     # exact positions
     for pos in source_positions_exact:
 
         g.message("STARTING EXACT MEASUREMENTS")
 
+        g.message("Starting TMD 2pt function")
+
         g.message("Generatring boosted src's")
-        srcDp = Measurement.create_src(pos, trafo, U[0].grid)
+        srcDp, srcDm = Measurement.create_src_2pt(pos, trafo, U[0].grid)
 
         g.message("Starting prop exact")
         prop_exact_f = g.eval(prop_exact * srcDp)
         g.message("forward prop done")
-        g.message(f"prop grid: {prop_exact_f.grid}")
-        g.message(f"trafo grid: {trafo.grid}")
+        prop_exact_b = g.eval(prop_exact * srcDm)
+        g.message("backward prop done")
 
         tag = "%s/%s" % ("exact", str(pos)) 
 
+        prop_b = Measurement.constr_backw_prop_for_TMD(prop_exact_b,W)
+        g.message("Start TMD contractions")
+        Measurement.contract_TMD(prop_exact_f, prop_b, phases, tag)
+        del prop_b
+        g.message("TMD done")
+
         g.message("Starting 2pt contraction (includes sink smearing)")
-        Measurement.contract_2pt(prop_exact_f, phases, trafo, tag)
+        Measurement.contract_2pt(prop_exact_f, prop_exact_b, phases, trafo, tag)
         g.message("2pt contraction done")
 
-        g.message("Create seq. backwards prop")
-        prop_bw = Measurement.create_bw_seq(prop_exact, prop_exact_f, trafo)
-
-        g.message("Create list of W * forward prop")
-        prop_f = Measurement.create_fw_prop_QPDF(prop_exact_f, W)
-
-        g.mem_report(details=False)
-        g.message("Start QPDF contractions")
-        Measurement.contract_QPDF(prop_f, prop_bw, phases, tag)
-        g.message("PQDF done")
-
         if(parameters["save_propagators"]):
-            Measurement.propagator_output(tag, prop_exact_f)
+            Measurement.propagator_output(tag, prop_exact_f, prop_exact_b)
 
         del prop_exact_f
-        del prop_bw
+        del prop_exact_b
 
         g.message("STARTING SLOPPY MEASUREMENTS")
+
+        g.message("Starting TMD 2pt function")
     
         g.message("Starting prop sloppy")
         prop_sloppy_f = g.eval(prop_sloppy * srcDp)
         g.message("forward prop done")
+        prop_sloppy_b = g.eval(prop_sloppy * srcDm)
+        g.message("backward prop done")
 
         del srcDp
+        del srcDm
 
         tag = "%s/%s" % ("sloppy", str(pos))
 
+        prop_b = Measurement.constr_backw_prop_for_TMD(prop_sloppy_b,W)
 
+        g.message("Start TMD contractions")
+        Measurement.contract_TMD(prop_sloppy_f, prop_b, phases, tag)
+        del prop_b
+        g.message("TMD done")
 
         g.message("Starting 2pt contraction (includes sink smearing)")
-        Measurement.contract_2pt(prop_sloppy_f, phases, trafo, tag)
+        Measurement.contract_2pt(prop_sloppy_f, prop_sloppy_b, phases, trafo, tag)
         g.message("2pt contraction done")
 
-        g.message("Create seq. backwards prop")
-        prop_bw = Measurement.create_bw_seq(prop_sloppy, prop_sloppy_f, trafo)
-
-        g.message("Create list of W * forward prop")
-        prop_f = Measurement.create_fw_prop_QPDF(prop_sloppy_f, W)
-
-        g.mem_report(details=False)
-        g.message("Start QPDF contractions")
-        Measurement.contract_QPDF(prop_f, prop_bw, phases, tag)
-        g.message("PQDF done")
-
         if(parameters["save_propagators"]):
-            Measurement.propagator_output(tag, prop_sloppy_f)
+            Measurement.propagator_output(tag, prop_sloppy_f, prop_sloppy_b)
 
-        del prop_bw
         del prop_sloppy_f
+        del prop_sloppy_b
      
     g.message("exact positions done")
 
@@ -256,40 +238,39 @@ for group, job, conf, jid, n in run_jobs:
         g.message("STARTING SLOPPY MEASUREMENTS")
         tag = "%s/%s" % ("sloppy", str(pos))
 
-        g.message("Starting DA 2pt function")
+        g.message("Starting TMD 2pt function")
 
         g.message("Generatring boosted src's")
-        srcDp = Measurement.create_src(pos, trafo, U[0].grid)  
+        srcDp, srcDm = Measurement.create_src_2pt(pos, trafo, U[0].grid)  
 
-        g.message("Starting prop sloppy")
+        g.message("Starting prop exact")
         prop_sloppy_f = g.eval(prop_sloppy * srcDp)
         g.message("forward prop done")
+        prop_sloppy_b = g.eval(prop_sloppy * srcDm)
+        g.message("backward prop done")
 
         del srcDp
+        del srcDm
+    
+        prop_b = Measurement.constr_backw_prop_for_TMD(prop_sloppy_b,W)
 
-        tag = "%s/%s" % ("sloppy", str(pos))
+        g.message("Start TMD contractions")
+        Measurement.contract_TMD(prop_sloppy_f, prop_b, phases, tag)
+        g.message("TMD contractions done")
+        del prop_b
 
+        g.message("Starting pion 2pt function")
 
-
-        g.message("Starting 2pt contraction (includes sink smearing)")
-        Measurement.contract_2pt(prop_sloppy_f, phases, trafo, tag)
-        g.message("2pt contraction done")
-
-        g.message("Create seq. backwards prop")
-        prop_bw = Measurement.create_bw_seq(prop_sloppy, prop_sloppy_f, trafo)
-
-        g.message("Create list of W * forward prop")
-        prop_f = Measurement.create_fw_prop_QPDF(prop_sloppy_f, W)
-
-        g.message("Start QPDF contractions")
-        Measurement.contract_QPDF(prop_f, prop_bw, phases, tag)
-        g.message("PQDF done")
+        g.message("Starting pion contraction (includes sink smearing)")
+        Measurement.contract_2pt(prop_sloppy_f, prop_sloppy_b, phases, trafo, tag)
+        g.message("pion contraction done")
 
         if(parameters["save_propagators"]):
-            Measurement.propagator_output(tag, prop_sloppy_f) 
-    
+            Measurement.propagator_output(tag, prop_sloppy_f, prop_sloppy_b)
+
+        del prop_sloppy_f
+        del prop_sloppy_b      
     
     g.message("sloppy positions done")
         
 #del pin
-

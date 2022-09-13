@@ -269,6 +269,66 @@ class pion_DA_measurement(pion_measurement):
                     self.output_correlator.write(out_tag, corr_t)
                     #g.message("Correlator %s\n" % out_tag, corr_t)
 
+class TMD_WF_measurement(pion_measurement):
+    def __init__(self,parameters):
+        self.zmax = parameters["zmax"]
+        self.eta = parameters["eta"]
+        self.b_perp = parameters["b_perp"]
+        self.b_z = parameters["b_z"]
+        self.pzmin = parameters["pzmin"]
+        self.pzmax = parameters["pzmax"]
+        self.plist = [ [0,0, pz, 0], for pz in range(self.pzmin,self.pzmax)]
+        self.width = parameters["width"]
+        self.pos_boost = parameters["pos_boost"]
+        self.neg_boost = parameters["neg_boost"]
+        self.save_propagators = paremters["save_propagators"]
+
+    def contract_TMD(self, prop_f, prop_b, phases, tag):
+
+        # create and save correlators
+        # I think we might not need a slice_trTMD function in cgpt?
+        corr = g.slice_trDA(prop_b,prop_f,phases, 3)
+
+        # corr = g.slice(
+        #      g.trace(g.adj(prop_b) * W * g.gamma["Z"] * P * prop_f), 3)
+
+        g.message("Starting IO")       
+        for z, corr_p in enumerate(corr):
+            corr_tag = "%s/TMD/z%s" % (tag, str(z))
+            for i, corr_mu in enumerate(corr_p):
+                p_tag = f"{corr_tag}/p{self.plist[i]}"
+                for j, corr_t in enumerate(corr_mu):
+                    out_tag = f"{p_tag}/{my_gammas[j]}"
+                    self.output_correlator.write(out_tag, corr_t)
+                    #g.message("Correlator %s\n" % out_tag, corr_t)
+    
+    def constr_backw_prop_for_TMD(self, prop_b, W):
+        g.message("Creating list of W*prop_b for all z+b_perp-z+b_z")
+        prop_list = [prop_b,]
+
+        for z in range(1,self.zmax):
+            prop_list.append(g.eval(g.adj(W[z] * g.cshift(prop_b,2,z))))
+        for x in range(0,self.b_perp):
+            prop_list.append(g.eval(g.adj(W[self.zmax + x] * g.cshift(prop_b,0,x))))
+        for z in range(0,self.zmax-self.b_z):
+            prop_list.append(g.eval(g.adj(W[self.zmax + self.b_perp + z] * g.cshift(prop_b,2,-z))))
+        
+        return prop_list
+
+    # create Wilson lines from all to all + zmax + b_perp - zmax - b_z
+    # fixing b_perp direction to be x for now
+    def create_mod_WL(self, U):
+        W = []
+        W.append(g.qcd.gauge.unit(U[2].grid)[0])
+        for dz in range(0, self.zmax):
+            W.append(g.eval(W[dz-1] * g.cshift(U[2], 2, dz)))
+        for dx in range(0,self.b_perp):
+            W.append(g.eval(W[self.zmax+dx-1] * g.cshift(U[0], 0, dx)))
+        for dz in range(0, self.zmax-self.b_z):
+            W.append(g.eval(W[self.zmax+self.b_perp+dz-1] * g.cshift(U[2], 2, -dz)))
+
+        return W
+    
 class pion_ff_measurement(pion_measurement):
     def __init__(self, parameters):
         self.p = parameters["pf"]
