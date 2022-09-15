@@ -1,28 +1,34 @@
 #!/usr/bin/env python3
-
+#
+# Authors: Christoph Lehner 2020 / Philipp Scior 2021
+#
+# Calculate pion DA with A2A method
+#
 import gpt as g
 import os
+#import numpy as np
+from gpt_qpdf_utils import pion_measurement
 
-from gpt_qpdf_utils import TMD_WF_measurement
+# configure
+#root_output = "/p/project/chbi21/gpt_test/DA"
+root_output ="."
 
-root_output  = "."
-
-
+# 420, 500, 580
 groups = {
-    "polaris_batch_0": {
+    "booster_batch_0": {
         "confs": [
-            "100"
+            "420",
+            "1960",
+            "2000",
         ],
-        "evec_fmt": "~/64I/lanczos.output",
-        "conf_fmt":  "~/64I/ckpoint_lat.%s",
+        #"evec_fmt": "/p/scratch/gm2dwf/evecs/96I/%s/lanczos.output",
+	    "evec_fmt": "/p/project/chbi21/gpt_test/96I/lanczos.output",
+        "conf_fmt": "/p/project/chbi21/gpt_test/96I/ckpoint_lat.%s",
     },
-}
 
+}
 parameters = {
-    "eta" : 2,
-    "b_perp" : 4,
-    "b_T": 4,
-    "b_z" : 4,
+    "zmax" : 24,
     "pzmin" : 0,
     "pzmax" : 5,
     "width" : 2.2,
@@ -33,19 +39,21 @@ parameters = {
 
 
 jobs = {
-    "polaris_exact_0": {
+    "booster_exact_0": {
         "exact": 1,
         "sloppy": 0,
         "low": 0,
-    },
-    "polaris_sloppy_0": {
+    },  
+    "booster_sloppy_0": {
         "exact": 0,
         "sloppy": 10,
         "low": 0,
     }, 
 }
 
+
 jobs_per_run = g.default.get_int("--gpt_jobs", 1)
+
 
 
 # find jobs for this run
@@ -89,6 +97,11 @@ else:
     run_jobs = bytes()
 run_jobs = eval(g.broadcast(0, run_jobs).decode("utf-8"))
 
+# every node now knows what to do
+
+
+
+# configuration needs to be the same for all jobs, so load eigenvectors and configuration
 conf = run_jobs[0][2]
 group = run_jobs[0][0]
 
@@ -103,8 +116,6 @@ U = g.qcd.gauge.random(grid, rng)
 g.message("finished loading gauge config")
 
 
-
-
 # do gauge fixing
 
 U_prime, trafo = g.gauge_fix(U, maxiter=500)
@@ -112,24 +123,24 @@ del U_prime
 
 L = U[0].grid.fdimensions
 
+Measurement = pion_measurement(parameters)
 
-
-Measurement = TMD_WF_measurement(parameters)
+#prop_exact, prop_sloppy, pin = Measurement.make_96I_inverter(U, groups[group]["evec_fmt"])
 
 prop_exact, prop_sloppy = Measurement.make_debugging_inverter(U)
 
 phases = Measurement.make_mom_phases(U[0].grid)
+
 
 # show available memory
 g.mem_report(details=False)
 g.message(
     """
 ================================================================================
-       TMD run on polaris ;  this run will attempt:
+       2pt run on booster ;  this run will attempt:
 ================================================================================
 """
 )
-
 # per job
 for group, job, conf, jid, n in run_jobs:
     g.message(
@@ -141,7 +152,7 @@ for group, job, conf, jid, n in run_jobs:
     )
 
     job_seed = job.split("_correlated")[0]
-    rng = g.random(f"TMD-ensemble-{conf}-{job_seed}")
+    rng = g.random(f"2PT-ensemble-{conf}-{job_seed}")
 
     source_positions_sloppy = [
         [rng.uniform_int(min=0, max=L[i] - 1) for i in range(4)]
@@ -161,15 +172,14 @@ for group, job, conf, jid, n in run_jobs:
 
     Measurement.set_output_facilites(f"{root_job}/correlators",f"{root_job}/propagators")
 
-    g.message("Starting modified Wilson loops")
-    W = Measurement.create_mod_WL(U)
+    
 
     # exact positions
     for pos in source_positions_exact:
 
         g.message("STARTING EXACT MEASUREMENTS")
 
-        g.message("Starting TMD wavefunction")
+        g.message("Starting 2pt function")
 
         g.message("Generatring boosted src's")
         srcDp, srcDm = Measurement.create_src_2pt(pos, trafo, U[0].grid)
@@ -182,19 +192,19 @@ for group, job, conf, jid, n in run_jobs:
 
         tag = "%s/%s" % ("exact", str(pos)) 
 
-        prop_b = Measurement.constr_backw_prop_for_TMD(prop_exact_b,W)
-        g.message("Start TMD contractions")
-        Measurement.contract_TMD(prop_exact_f, prop_b, phases, tag)
-        del prop_b
-        g.message("TMD done")
+        g.message("Starting 2pt contraction (includes sink smearing)")
+        Measurement.contract_2pt(prop_exact_f, prop_exact_b, phases, trafo, tag)
+        g.message("2pt contraction done")
 
+        if(parameters["save_propagators"]):
+            Measurement.propagator_output(tag, prop_exact_f, prop_exact_b)
 
         del prop_exact_f
         del prop_exact_b
 
         g.message("STARTING SLOPPY MEASUREMENTS")
 
-        g.message("Starting TMD wavefunction")
+        g.message("Starting 2pt function")
     
         g.message("Starting prop sloppy")
         prop_sloppy_f = g.eval(prop_sloppy * srcDp)
@@ -207,14 +217,12 @@ for group, job, conf, jid, n in run_jobs:
 
         tag = "%s/%s" % ("sloppy", str(pos))
 
-        prop_b = Measurement.constr_backw_prop_for_TMD(prop_sloppy_b,W)
+        g.message("Starting 2pt contraction (includes sink smearing)")
+        Measurement.contract_2pt(prop_sloppy_f, prop_sloppy_b, phases, trafo, tag)
+        g.message("2pt contraction done")
 
-        g.message("Start TMD contractions")
-        Measurement.contract_TMD(prop_sloppy_f, prop_b, phases, tag)
-        del prop_b
-        g.message("TMD done")
-
-        
+        if(parameters["save_propagators"]):
+            Measurement.propagator_output(tag, prop_sloppy_f, prop_sloppy_b)
 
         del prop_sloppy_f
         del prop_sloppy_b
@@ -227,7 +235,7 @@ for group, job, conf, jid, n in run_jobs:
         g.message("STARTING SLOPPY MEASUREMENTS")
         tag = "%s/%s" % ("sloppy", str(pos))
 
-        g.message("Starting TMD wavefunction")
+        g.message("Starting 2pt function")
 
         g.message("Generatring boosted src's")
         srcDp, srcDm = Measurement.create_src_2pt(pos, trafo, U[0].grid)  
@@ -241,17 +249,20 @@ for group, job, conf, jid, n in run_jobs:
         del srcDp
         del srcDm
     
-        prop_b = Measurement.constr_backw_prop_for_TMD(prop_sloppy_b,W)
 
-        g.message("Start TMD contractions")
-        Measurement.contract_TMD(prop_sloppy_f, prop_b, phases, tag)
-        g.message("TMD contractions done")
-        del prop_b
+        g.message("Starting pion 2pt function")
 
-       
+        g.message("Starting pion contraction (includes sink smearing)")
+        Measurement.contract_2pt(prop_sloppy_f, prop_sloppy_b, phases, trafo, tag)
+        g.message("pion contraction done")
+
+        if(parameters["save_propagators"]):
+            Measurement.propagator_output(tag, prop_sloppy_f, prop_sloppy_b)
+
         del prop_sloppy_f
         del prop_sloppy_b      
     
     g.message("sloppy positions done")
         
 #del pin
+
