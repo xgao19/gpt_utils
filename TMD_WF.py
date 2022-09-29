@@ -11,23 +11,23 @@ root_output  = "."
 groups = {
     "polaris_batch_0": {
         "confs": [
-            "100"
+            "1260"
         ],
         "evec_fmt": "~/64I/lanczos.output",
-        "conf_fmt":  "~/64I/ckpoint_lat.%s",
+        "conf_fmt":  "/home/bollwegd/testconf/ckpoint_lat.%s",
     },
 }
 
 parameters = {
-    "eta" : 2,
-    "b_perp" : 4,
-    "b_T": 4,
-    "b_z" : 4,
+    "eta" : 4,
+    "b_perp" : 8,
+    "b_T": 8,
+    "b_z" : 8,
     "pzmin" : 0,
     "pzmax" : 5,
     "width" : 2.2,
-    "pos_boost" : [0,0,0],
-    "neg_boost" : [0,0,0],
+    "pos_boost" : [0,0,3],
+    "neg_boost" : [0,0,-3],
     "save_propagators" : True
 }
 
@@ -35,7 +35,7 @@ parameters = {
 jobs = {
     "polaris_exact_0": {
         "exact": 1,
-        "sloppy": 0,
+        "sloppy": 10,
         "low": 0,
     },
     "polaris_sloppy_0": {
@@ -94,12 +94,15 @@ group = run_jobs[0][0]
 
 
 ##### small dummy used for testing
-grid = g.grid([8,8,8,8], g.double)
-rng = g.random("seed text")
-U = g.qcd.gauge.random(grid, rng)
+#grid = g.grid([16,16,16,16], g.double)
+#rng = g.random("seed text")
+#U = g.qcd.gauge.random(grid, rng)
 
 # loading gauge configuration
-#U = g.load(groups[group]["conf_fmt"] % conf)
+print("just testing sth")
+print(groups[group]["conf_fmt"] % conf)
+U = g.load(groups[group]["conf_fmt"] % conf)
+rng = g.random("seed text")
 g.message("finished loading gauge config")
 
 
@@ -107,7 +110,7 @@ g.message("finished loading gauge config")
 
 # do gauge fixing
 
-U_prime, trafo = g.gauge_fix(U, maxiter=500)
+U_prime, trafo = g.gauge_fix(U, maxiter=180)
 del U_prime
 
 L = U[0].grid.fdimensions
@@ -143,14 +146,16 @@ for group, job, conf, jid, n in run_jobs:
     job_seed = job.split("_correlated")[0]
     rng = g.random(f"TMD-ensemble-{conf}-{job_seed}")
 
-    source_positions_sloppy = [
-        [rng.uniform_int(min=0, max=L[i] - 1) for i in range(4)]
-        for j in range(jobs[job]["sloppy"])
-    ]
-    source_positions_exact = [
-        [rng.uniform_int(min=0, max=L[i] - 1) for i in range(4)]
-        for j in range(jobs[job]["exact"])
-    ]
+    source_positions_sloppy = [[11,11,11,11],[0,1,0,14],[0,0,0,0]]
+#    source_positions_sloppy = [
+#        [rng.uniform_int(min=0, max=L[i] - 1) for i in range(4)]
+#        for j in range(jobs[job]["sloppy"])
+#    ]
+    source_positions_exact = [[0,0,5,0]]
+    #source_positions_exact = [
+    #    [rng.uniform_int(min=0, max=L[i] - 1) for i in range(4)]
+    #    for j in range(jobs[job]["exact"])
+    #]
 
 
 

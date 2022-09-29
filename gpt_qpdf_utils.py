@@ -134,35 +134,35 @@ class pion_measurement:
                 #"c": 0.5,
                 #"Ls": 12,
                 #"boundary_phases": [1.0, 1.0, 1.0, -1.0],},
-
+#MDWF_2+1f_64nt128_IWASAKI_b2.25_ls12b+c2_M1.8_ms0.02661_mu0.000678_rhmc_HR_G
                 #64I params
                 "mass": 0.000678,
                 "M5": 1.8,
                 "b": 1.5,
                 "c": 0.5,
                 "Ls": 12,
-                "boundary_phases": [1.0, 1.0, 1.0, -1.0],},
+                "boundary_phases": [1.0, 1.0, 1.0, 1.0],},
         )
 
         l_sloppy = l_exact.converted(g.single)
 
-        light_innerL_inverter = g.algorithms.inverter.preconditioned(g.qcd.fermion.preconditioner.eo1_ne(parity=g.odd), g.algorithms.inverter.cg(eps = 1e-8, maxiter = 50))
-        light_innerH_inverter = g.algorithms.inverter.preconditioned(g.qcd.fermion.preconditioner.eo1_ne(parity=g.odd), g.algorithms.inverter.cg(eps = 1e-8, maxiter = 70))
+        light_innerL_inverter = g.algorithms.inverter.preconditioned(g.qcd.fermion.preconditioner.eo1_ne(parity=g.odd), g.algorithms.inverter.cg(eps = 1e-4, maxiter = 7000))
+        light_innerH_inverter = g.algorithms.inverter.preconditioned(g.qcd.fermion.preconditioner.eo1_ne(parity=g.odd), g.algorithms.inverter.cg(eps = 1e-4, maxiter = 5000))
 
         light_exact_inverter = g.algorithms.inverter.defect_correcting(
             g.algorithms.inverter.mixed_precision(light_innerH_inverter, g.single, g.double),
-            eps=1e-8,
-            maxiter=4,
+            eps=1e-4,
+            maxiter=1000,
         )
 
         light_sloppy_inverter = g.algorithms.inverter.defect_correcting(
             g.algorithms.inverter.mixed_precision(light_innerL_inverter, g.single, g.double),
-            eps=1e-8,
-            maxiter=2,
+            eps=1e-4,
+            maxiter=200,
         )
 
-        prop_l_sloppy = l_exact.propagator(light_sloppy_inverter).grouped(6)
-        prop_l_exact = l_exact.propagator(light_exact_inverter).grouped(6)
+        prop_l_sloppy = l_sloppy.propagator(light_innerH_inverter).grouped(6)
+        prop_l_exact = l_exact.propagator(light_innerL_inverter).grouped(6)
         return prop_l_exact, prop_l_sloppy
 
 
@@ -208,7 +208,7 @@ class pion_measurement:
             for j, corr_t in enumerate(corr_mu):
                 out_tag = f"{out_tag}/{my_gammas[j]}"
                 self.output_correlator.write(out_tag, corr_t)
-                #g.message("Correlator %s\n" % out_tag, corr_t)
+                g.message("Correlator %s\n" % out_tag, corr_t)
 
     #function that creates boosted, smeared src.
     def create_src_2pt(self, pos, trafo, grid):
@@ -267,7 +267,7 @@ class pion_DA_measurement(pion_measurement):
                 for j, corr_t in enumerate(corr_mu):
                     out_tag = f"{p_tag}/{my_gammas[j]}"
                     self.output_correlator.write(out_tag, corr_t)
-                    #g.message("Correlator %s\n" % out_tag, corr_t)
+                    g.message("Correlator %s\n" % out_tag, corr_t)
 
 class TMD_WF_measurement(pion_measurement):
     def __init__(self,parameters):
@@ -300,25 +300,29 @@ class TMD_WF_measurement(pion_measurement):
                 for j, corr_t in enumerate(corr_mu):
                     out_tag = f"{p_tag}/{my_gammas[j]}"
                     self.output_correlator.write(out_tag, corr_t)
-                    #g.message("Correlator %s\n" % out_tag, corr_t)
+                    g.message("Correlator %s\n" % out_tag, corr_t)
+                    
     def create_src_TMD(self, pos, trafo, grid):
         
         srcD = g.mspincolor(grid)
         srcD[:] = 0
         
-        srcB_perp = g.mspincolor(grid)
-        srcB_perp[:] = 0
+        #srcB_perp = g.mspincolor(grid)
+        #srcB_perp[:] = 0
 
         g.create.point(srcD, pos)
-        pos_bp = pos
-        pos_bp[0] += b_perp
-        pos_bp[0] = pos_bp[0] % L[0]
-        g.create.point(srcB_perp, pos_bp)
+        #pos_bp = pos
+        #pos_bp[0] += b_perp
+        #pos_bp[0] = pos_bp[0] % L[0]
+        g.message(f"placing src_m at {pos}")
+        g.message(f"placing src_p at {pos}")
         g.message("point src set")
         srcDm = g.create.smear.boosted_smearing(trafo, srcD, w=self.width, boost=self.neg_boost)
         g.message("pos. boosted src done")
-        srcDp = g.create.smear.boosted_smearing(trafo, srcB_perp, w=self.width, boost=self.pos_boost)
+        g.message(srcDm)
+        srcDp = g.create.smear.boosted_smearing(trafo, srcD, w=self.width, boost=self.pos_boost)
         g.message("neg. boosted src done")
+        g.message(srcDp)
         del srcD
         g.message("deleted pt. src, now returning")
 

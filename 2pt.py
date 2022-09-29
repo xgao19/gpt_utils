@@ -31,6 +31,7 @@ parameters = {
     "zmax" : 24,
     "pzmin" : 0,
     "pzmax" : 5,
+    "plist" : [0,0,0]
     "width" : 2.2,
     "pos_boost" : [0,0,0],
     "neg_boost" : [0,0,0],
