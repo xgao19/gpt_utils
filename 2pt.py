@@ -17,13 +17,11 @@ root_output ="."
 groups = {
     "booster_batch_0": {
         "confs": [
-            "420",
-            "1960",
-            "2000",
+            "1260",
         ],
         #"evec_fmt": "/p/scratch/gm2dwf/evecs/96I/%s/lanczos.output",
 	    "evec_fmt": "/p/project/chbi21/gpt_test/96I/lanczos.output",
-        "conf_fmt": "/p/project/chbi21/gpt_test/96I/ckpoint_lat.%s",
+        "conf_fmt": "/home/bollwegd/testconf/ckpoint_lat.%s",
     },
 
 }
@@ -31,7 +29,7 @@ parameters = {
     "zmax" : 24,
     "pzmin" : 0,
     "pzmax" : 5,
-    "plist" : [0,0,0]
+    "plist" : [[0,0,0,0],[0,0,3,0]],
     "width" : 2.2,
     "pos_boost" : [0,0,0],
     "neg_boost" : [0,0,0],
@@ -42,7 +40,7 @@ parameters = {
 jobs = {
     "booster_exact_0": {
         "exact": 1,
-        "sloppy": 0,
+        "sloppy": 4,
         "low": 0,
     },  
     "booster_sloppy_0": {
@@ -108,12 +106,13 @@ group = run_jobs[0][0]
 
 
 ##### small dummy used for testing
-grid = g.grid([8,8,8,8], g.double)
-rng = g.random("seed text")
-U = g.qcd.gauge.random(grid, rng)
+#grid = g.grid([8,8,8,8], g.double)
+#rng = g.random("seed text")
+#U = g.qcd.gauge.random(grid, rng)
 
 # loading gauge configuration
-#U = g.load(groups[group]["conf_fmt"] % conf)
+U = g.load(groups[group]["conf_fmt"] % conf)
+rng = g.random("seed text")
 g.message("finished loading gauge config")
 
 
@@ -129,7 +128,7 @@ Measurement = pion_measurement(parameters)
 #prop_exact, prop_sloppy, pin = Measurement.make_96I_inverter(U, groups[group]["evec_fmt"])
 
 prop_exact, prop_sloppy = Measurement.make_debugging_inverter(U)
-
+g.message("making mom_phases")
 phases = Measurement.make_mom_phases(U[0].grid)
 
 

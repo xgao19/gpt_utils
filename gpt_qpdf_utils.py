@@ -161,7 +161,7 @@ class pion_measurement:
             maxiter=200,
         )
 
-        prop_l_sloppy = l_sloppy.propagator(light_innerH_inverter).grouped(6)
+        prop_l_sloppy = l_exact.propagator(light_innerH_inverter).grouped(6)
         prop_l_exact = l_exact.propagator(light_innerL_inverter).grouped(6)
         return prop_l_exact, prop_l_sloppy
 
