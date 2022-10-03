@@ -218,13 +218,13 @@ class pion_measurement:
         srcD = g.mspincolor(grid)
         
         
-       # g.create.point(srcD, pos)
-        g.create.point(srcD, [0,0,0,0])
+        g.create.point(srcD, pos)
+        #g.create.point(srcD, [0,0,0,0])
        # g.message("point src set")
         #srcDm = srcD
         srcDm = g.create.smear.boosted_smearing(trafo, srcD, w=self.width, boost=self.neg_boost)
         g.message("pos. boosted src done")
-        g.create.point(srcD, [0,0,0,0])
+        
         srcDp = g.create.smear.boosted_smearing(trafo, srcD, w=self.width, boost=self.pos_boost)
         g.message("neg. boosted src done")
         del srcD
