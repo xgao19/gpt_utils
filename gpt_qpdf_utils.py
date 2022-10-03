@@ -136,18 +136,18 @@ class pion_measurement:
                 #"boundary_phases": [1.0, 1.0, 1.0, -1.0],},
 #MDWF_2+1f_64nt128_IWASAKI_b2.25_ls12b+c2_M1.8_ms0.02661_mu0.000678_rhmc_HR_G
                 #64I params
-                "mass": 0.000678,
+                "mass": 0.1,
                 "M5": 1.8,
-                "b": 1.5,
-                "c": 0.5,
-                "Ls": 12,
-                "boundary_phases": [1.0, 1.0, 1.0, 1.0],},
+                "b": 1.0,
+                "c": 0.0,
+                "Ls": 24,
+                "boundary_phases": [1.0, 1.0, 1.0, -1.0],},
         )
 
         l_sloppy = l_exact.converted(g.single)
 
-        light_innerL_inverter = g.algorithms.inverter.preconditioned(g.qcd.fermion.preconditioner.eo1_ne(parity=g.odd), g.algorithms.inverter.cg(eps = 1e-4, maxiter = 7000))
-        light_innerH_inverter = g.algorithms.inverter.preconditioned(g.qcd.fermion.preconditioner.eo1_ne(parity=g.odd), g.algorithms.inverter.cg(eps = 1e-4, maxiter = 5000))
+        light_innerL_inverter = g.algorithms.inverter.preconditioned(g.qcd.fermion.preconditioner.eo2_ne(), g.algorithms.inverter.cg(eps = 1e-4, maxiter = 7000))
+        light_innerH_inverter = g.algorithms.inverter.preconditioned(g.qcd.fermion.preconditioner.eo2_ne(), g.algorithms.inverter.cg(eps = 1e-4, maxiter = 5000))
 
         light_exact_inverter = g.algorithms.inverter.defect_correcting(
             g.algorithms.inverter.mixed_precision(light_innerH_inverter, g.single, g.double),
@@ -168,9 +168,11 @@ class pion_measurement:
 
     ############## make list of complex phases for momentum proj.
     def make_mom_phases(self, grid):    
-        one = g.complex(grid)
+        one = g.identity(g.complex(grid))
         pp = [-2 * np.pi * np.array(p) / grid.fdimensions for p in self.plist]
+       
         P = g.exp_ixp(pp)
+       
         mom = [g.eval(pp*one) for pp in P]
         return mom
 
@@ -206,20 +208,23 @@ class pion_measurement:
         for i, corr_mu in enumerate(corr_p):
             out_tag = f"{corr_tag}/p{self.plist[i]}"
             for j, corr_t in enumerate(corr_mu):
-                out_tag = f"{out_tag}/{my_gammas[j]}"
-                self.output_correlator.write(out_tag, corr_t)
-                g.message("Correlator %s\n" % out_tag, corr_t)
+                g_tag = f"{out_tag}/{my_gammas[j]}"
+                self.output_correlator.write(g_tag, corr_t)
+                g.message("Correlator %s\n" % g_tag, corr_t)
 
     #function that creates boosted, smeared src.
     def create_src_2pt(self, pos, trafo, grid):
         
         srcD = g.mspincolor(grid)
-        srcD[:] = 0
         
-        g.create.point(srcD, pos)
-        g.message("point src set")
+        
+       # g.create.point(srcD, pos)
+        g.create.point(srcD, [0,0,0,0])
+       # g.message("point src set")
+        #srcDm = srcD
         srcDm = g.create.smear.boosted_smearing(trafo, srcD, w=self.width, boost=self.neg_boost)
         g.message("pos. boosted src done")
+        g.create.point(srcD, [0,0,0,0])
         srcDp = g.create.smear.boosted_smearing(trafo, srcD, w=self.width, boost=self.pos_boost)
         g.message("neg. boosted src done")
         del srcD
@@ -709,7 +714,7 @@ class proton_measurement:
 
     ############## make list of complex phases for momentum proj.
     def make_mom_phases(self, grid):    
-        one = g.complex(grid)
+        one = g.identity(g.complex(grid))
         pp = [-2 * np.pi * np.array(p) / grid.fdimensions for p in self.plist]
         P = g.exp_ixp(pp)
         mom = [g.eval(pp*one) for pp in P]
